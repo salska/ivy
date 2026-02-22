@@ -20,6 +20,7 @@ export function registerAgentCommands(
     .option("--work <work>", "Current work description")
     .option("--parent <sessionId>", "Parent session ID (for delegates)")
     .option("--session-hint <hint>", "Session hint for stable ID generation")
+    .option("--metadata <json>", "JSON metadata blob")
     .action(
       withErrorHandling(async (opts) => {
         const ctx = getContext();
@@ -28,6 +29,7 @@ export function registerAgentCommands(
           project: opts.project,
           work: opts.work,
           parentId: opts.parent,
+          metadata: opts.metadata,
         });
 
         if (ctx.options.json) {

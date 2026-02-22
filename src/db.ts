@@ -13,6 +13,7 @@ import {
   MIGRATE_V3_SQL,
   MIGRATE_V4_SQL,
   MIGRATE_V5_SQL,
+  MIGRATE_V6_SQL,
 } from "./schema";
 import type { DbOptions } from "./types";
 import { loadConfig } from "./config";
@@ -105,7 +106,7 @@ export function openDatabase(path: string): Database {
       closeDatabase(db);
       throw new Error(
         `Database schema version ${version} is newer than supported version ${CURRENT_SCHEMA_VERSION}. ` +
-          `Please upgrade the blackboard CLI.`
+        `Please upgrade the blackboard CLI.`
       );
     }
     if (version < CURRENT_SCHEMA_VERSION) {
@@ -139,27 +140,32 @@ export function migrate(db: Database): void {
     description: string;
     fn: (db: Database) => void;
   }> = [
-    {
-      version: 2,
-      description: "Remove event_type CHECK constraint (free-form event types)",
-      fn: (db) => { db.exec(MIGRATE_V2_SQL); },
-    },
-    {
-      version: 3,
-      description: "Add metadata column to heartbeats table",
-      fn: (db) => { db.exec(MIGRATE_V3_SQL); },
-    },
-    {
-      version: 4,
-      description: "Remove source CHECK constraint (extensible source types)",
-      fn: (db) => { db.exec(MIGRATE_V4_SQL); },
-    },
-    {
-      version: 5,
-      description: "Add waiting_for_response status to work_items",
-      fn: (db) => { db.exec(MIGRATE_V5_SQL); },
-    },
-  ];
+      {
+        version: 2,
+        description: "Remove event_type CHECK constraint (free-form event types)",
+        fn: (db) => { db.exec(MIGRATE_V2_SQL); },
+      },
+      {
+        version: 3,
+        description: "Add metadata column to heartbeats table",
+        fn: (db) => { db.exec(MIGRATE_V3_SQL); },
+      },
+      {
+        version: 4,
+        description: "Remove source CHECK constraint (extensible source types)",
+        fn: (db) => { db.exec(MIGRATE_V4_SQL); },
+      },
+      {
+        version: 5,
+        description: "Add waiting_for_response status to work_items",
+        fn: (db) => { db.exec(MIGRATE_V5_SQL); },
+      },
+      {
+        version: 6,
+        description: "Add steering_rules table for learning loop",
+        fn: (db) => { db.exec(MIGRATE_V6_SQL); },
+      },
+    ];
 
   const pending = migrations.filter((m) => m.version > current);
   for (const migration of pending) {

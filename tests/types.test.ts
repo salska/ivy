@@ -58,8 +58,8 @@ describe("types", () => {
   });
 
   describe("EventType", () => {
-    it("KNOWN_EVENT_TYPES lists 20 known blackboard event types", () => {
-      expect(KNOWN_EVENT_TYPES).toHaveLength(20);
+    it("KNOWN_EVENT_TYPES lists 25 known blackboard event types", () => {
+      expect(KNOWN_EVENT_TYPES).toHaveLength(25);
       expect(KNOWN_EVENT_TYPES).toContain("agent_registered");
       expect(KNOWN_EVENT_TYPES).toContain("agent_deregistered");
       expect(KNOWN_EVENT_TYPES).toContain("agent_stale");
@@ -80,6 +80,12 @@ describe("types", () => {
       expect(KNOWN_EVENT_TYPES).toContain("stale_locks_released");
       expect(KNOWN_EVENT_TYPES).toContain("content_blocked");
       expect(KNOWN_EVENT_TYPES).toContain("content_reviewed");
+      // Learning loop event types
+      expect(KNOWN_EVENT_TYPES).toContain("fact_extracted");
+      expect(KNOWN_EVENT_TYPES).toContain("pattern_detected");
+      expect(KNOWN_EVENT_TYPES).toContain("rule_synthesized");
+      expect(KNOWN_EVENT_TYPES).toContain("rule_retired");
+      expect(KNOWN_EVENT_TYPES).toContain("session_learning");
     });
 
     it("EventType is string (free-form, not constrained)", () => {

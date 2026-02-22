@@ -8,6 +8,7 @@ import { listAgents } from "./agent";
 import { listWorkItems, getWorkItemStatus, deleteWorkItem, updateWorkItemMetadata, appendWorkItemEvent } from "./work";
 import { listProjects, getProjectDetail } from "./project";
 import { observeEvents } from "./events";
+import { queryLearnings, getSteeringRules } from "./learnings";
 import type { BlackboardAgent } from "./types";
 
 /**
@@ -37,7 +38,7 @@ function corsHeaders(req: Request): Record<string, string> {
 function jsonResponse(data: unknown, status = 200, cors: Record<string, string> = {}): Response {
   return new Response(
     JSON.stringify(
-      { ok: status < 400, ...data, timestamp: new Date().toISOString() },
+      { ok: status < 400, ...(data as Record<string, unknown>), timestamp: new Date().toISOString() },
       null,
       2
     ),
@@ -57,7 +58,7 @@ export function createServer(
   dbPath: string,
   port: number = 3141,
   options?: { allowedLogDirs?: string[] }
-): Server {
+): ReturnType<typeof Bun.serve> {
   const allowedLogDirs = options?.allowedLogDirs ?? [homedir()];
   return Bun.serve({
     port,
@@ -171,7 +172,7 @@ export function createServer(
             try {
               const meta = JSON.parse(agent.metadata);
               logPath = meta.logPath ?? null;
-            } catch {}
+            } catch { }
           }
 
           if (!logPath) {
@@ -276,7 +277,7 @@ export function createServer(
                 try {
                   const newEvents = db
                     .query("SELECT * FROM events WHERE id > ? ORDER BY id ASC LIMIT 50")
-                    .all(lastId) as Array<{ id: number; [key: string]: any }>;
+                    .all(lastId) as Array<{ id: number;[key: string]: any }>;
 
                   for (const event of newEvents) {
                     send(JSON.stringify(event), event.id);
@@ -308,6 +309,28 @@ export function createServer(
         if (url.pathname === "/api/projects") {
           const projects = listProjects(db);
           return jsonResponse({ count: projects.length, items: projects }, 200, cors);
+        }
+
+        // Learnings endpoint
+        if (url.pathname === "/api/learnings") {
+          const project = url.searchParams.get("project");
+          if (!project) {
+            return jsonResponse({ error: "project query parameter is required" }, 400, cors);
+          }
+          const limitStr = url.searchParams.get("limit");
+          const limit = limitStr ? parseInt(limitStr, 10) : undefined;
+          const learnings = queryLearnings(db, project, { limit });
+          return jsonResponse({ count: learnings.length, items: learnings }, 200, cors);
+        }
+
+        // Steering rules endpoint
+        if (url.pathname === "/api/steering-rules") {
+          const project = url.searchParams.get("project");
+          if (!project) {
+            return jsonResponse({ error: "project query parameter is required" }, 400, cors);
+          }
+          const rules = getSteeringRules(db, project);
+          return jsonResponse({ count: rules.length, items: rules }, 200, cors);
         }
 
         // Project detail endpoint

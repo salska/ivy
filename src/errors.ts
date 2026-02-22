@@ -16,7 +16,7 @@ export class BlackboardError extends Error {
  * In human mode, outputs error message to stderr.
  */
 export function withErrorHandling(
-  handler: (...args: any[]) => Promise<void>,
+  handler: (...args: any[]) => void | Promise<void>,
   jsonMode: () => boolean
 ): (...args: any[]) => Promise<void> {
   return async (...args: any[]) => {

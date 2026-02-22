@@ -8,6 +8,7 @@ export interface RegisterAgentOptions {
   project?: string;
   work?: string;
   parentId?: string;
+  metadata?: string;
 }
 
 export interface RegisterAgentResult {
@@ -58,6 +59,7 @@ export function registerAgent(
   const project = opts.project ?? null;
   const work = opts.work ? sanitizeText(opts.work) : null;
   const agentName = sanitizeText(opts.name);
+  const metadata = opts.metadata ? sanitizeText(opts.metadata) : null;
 
   const isDelegate = parentId !== null;
   const designation = isDelegate ? "Delegate agent" : "Agent";
@@ -65,9 +67,9 @@ export function registerAgent(
 
   db.transaction(() => {
     db.query(`
-      INSERT INTO agents (session_id, agent_name, pid, parent_id, project, current_work, status, started_at, last_seen_at)
-      VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?)
-    `).run(sessionId, agentName, pid, parentId, project, work, now, now);
+      INSERT INTO agents (session_id, agent_name, pid, parent_id, project, current_work, status, started_at, last_seen_at, metadata)
+      VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?, ?)
+    `).run(sessionId, agentName, pid, parentId, project, work, now, now, metadata);
 
     db.query(`
       INSERT INTO events (timestamp, event_type, actor_id, target_id, target_type, summary)

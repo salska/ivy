@@ -34,7 +34,7 @@ describe("schema SQL constants", () => {
     expect(timeout.timeout).toBe(5000);
   });
 
-  it("CREATE_TABLES_SQL creates all 6 tables", () => {
+  it("CREATE_TABLES_SQL creates all 7 tables", () => {
     for (const sql of PRAGMA_SQL) {
       db.exec(sql);
     }
@@ -52,8 +52,9 @@ describe("schema SQL constants", () => {
     expect(names).toContain("work_items");
     expect(names).toContain("heartbeats");
     expect(names).toContain("events");
+    expect(names).toContain("steering_rules");
     expect(names).toContain("schema_version");
-    expect(names).toHaveLength(6);
+    expect(names).toHaveLength(7);
   });
 
   it("CREATE_INDEXES_SQL creates all expected indexes", () => {
@@ -96,8 +97,8 @@ describe("schema SQL constants", () => {
     expect(version.version).toBe(1);
   });
 
-  it("CURRENT_SCHEMA_VERSION equals 5", () => {
-    expect(CURRENT_SCHEMA_VERSION).toBe(5);
+  it("CURRENT_SCHEMA_VERSION equals 6", () => {
+    expect(CURRENT_SCHEMA_VERSION).toBe(6);
   });
 });
 

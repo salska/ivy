@@ -1,9 +1,9 @@
-export const CURRENT_SCHEMA_VERSION = 5;
+export const CURRENT_SCHEMA_VERSION = 6;
 
 export const PRAGMA_SQL = [
-  "PRAGMA journal_mode = WAL;",
-  "PRAGMA foreign_keys = ON;",
-  "PRAGMA busy_timeout = 5000;",
+    "PRAGMA journal_mode = WAL;",
+    "PRAGMA foreign_keys = ON;",
+    "PRAGMA busy_timeout = 5000;",
 ];
 
 export const CREATE_TABLES_SQL = `
@@ -78,6 +78,23 @@ CREATE TABLE IF NOT EXISTS events (
     metadata      TEXT
 );
 
+CREATE TABLE IF NOT EXISTS steering_rules (
+    rule_id       TEXT PRIMARY KEY,
+    project_id    TEXT,
+    rule_text     TEXT NOT NULL,
+    source_event  INTEGER,
+    confidence    REAL DEFAULT 0.5,
+    hit_count     INTEGER DEFAULT 0,
+    status        TEXT DEFAULT 'active'
+                  CHECK (status IN ('active', 'retired', 'candidate')),
+    created_at    TEXT NOT NULL,
+    updated_at    TEXT NOT NULL,
+    metadata      TEXT,
+
+    FOREIGN KEY (project_id) REFERENCES projects(project_id),
+    FOREIGN KEY (source_event) REFERENCES events(id)
+);
+
 CREATE TABLE IF NOT EXISTS schema_version (
     version       INTEGER PRIMARY KEY,
     applied_at    TEXT NOT NULL,
@@ -102,6 +119,9 @@ CREATE INDEX IF NOT EXISTS idx_heartbeats_timestamp ON heartbeats(timestamp);
 CREATE INDEX IF NOT EXISTS idx_events_timestamp ON events(timestamp);
 CREATE INDEX IF NOT EXISTS idx_events_type ON events(event_type);
 CREATE INDEX IF NOT EXISTS idx_events_actor ON events(actor_id);
+
+CREATE INDEX IF NOT EXISTS idx_steering_rules_project ON steering_rules(project_id);
+CREATE INDEX IF NOT EXISTS idx_steering_rules_status ON steering_rules(status);
 `;
 
 export const SEED_VERSION_SQL = `
@@ -115,6 +135,8 @@ INSERT OR IGNORE INTO schema_version (version, applied_at, description)
 VALUES (4, datetime('now'), 'Remove source CHECK constraint (extensible sources)');
 INSERT OR IGNORE INTO schema_version (version, applied_at, description)
 VALUES (5, datetime('now'), 'Add waiting_for_response status to work_items');
+INSERT OR IGNORE INTO schema_version (version, applied_at, description)
+VALUES (6, datetime('now'), 'Add steering_rules table for learning loop');
 `;
 
 /**
@@ -230,5 +252,30 @@ CREATE INDEX IF NOT EXISTS idx_work_items_project ON work_items(project_id);
 CREATE INDEX IF NOT EXISTS idx_work_items_claimed_by ON work_items(claimed_by);
 CREATE INDEX IF NOT EXISTS idx_work_items_priority ON work_items(priority, status);
 PRAGMA foreign_keys = ON;
+`;
+
+/**
+ * Migration SQL for v5 → v6: Add steering_rules table for the learning loop.
+ */
+export const MIGRATE_V6_SQL = `
+CREATE TABLE IF NOT EXISTS steering_rules (
+    rule_id       TEXT PRIMARY KEY,
+    project_id    TEXT,
+    rule_text     TEXT NOT NULL,
+    source_event  INTEGER,
+    confidence    REAL DEFAULT 0.5,
+    hit_count     INTEGER DEFAULT 0,
+    status        TEXT DEFAULT 'active'
+                  CHECK (status IN ('active', 'retired', 'candidate')),
+    created_at    TEXT NOT NULL,
+    updated_at    TEXT NOT NULL,
+    metadata      TEXT,
+
+    FOREIGN KEY (project_id) REFERENCES projects(project_id),
+    FOREIGN KEY (source_event) REFERENCES events(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_steering_rules_project ON steering_rules(project_id);
+CREATE INDEX IF NOT EXISTS idx_steering_rules_status ON steering_rules(status);
 `;
 

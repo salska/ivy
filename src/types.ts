@@ -47,6 +47,12 @@ export const KNOWN_EVENT_TYPES = [
   "stale_locks_released",
   "content_blocked",
   "content_reviewed",
+  // Learning loop event types
+  "fact_extracted",
+  "pattern_detected",
+  "rule_synthesized",
+  "rule_retired",
+  "session_learning",
 ] as const;
 export type KnownEventType = (typeof KNOWN_EVENT_TYPES)[number];
 
@@ -127,4 +133,22 @@ export interface MigrationEntry {
 export interface DbOptions {
   dbPath?: string;
   envPath?: string;
+}
+
+// Steering rule status values
+export const STEERING_RULE_STATUSES = ["active", "retired", "candidate"] as const;
+export type SteeringRuleStatus = (typeof STEERING_RULE_STATUSES)[number];
+
+// Steering rule entity matching the steering_rules table
+export interface SteeringRule {
+  rule_id: string;
+  project_id: string | null;
+  rule_text: string;
+  source_event: number | null;
+  confidence: number;
+  hit_count: number;
+  status: SteeringRuleStatus;
+  created_at: string;
+  updated_at: string;
+  metadata: string | null;
 }
