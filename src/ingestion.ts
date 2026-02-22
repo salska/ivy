@@ -1,4 +1,6 @@
+// @ts-ignore — pai-content-filter may not be installed in all environments
 import { filterContentString } from "pai-content-filter";
+// @ts-ignore — pai-content-filter may not be installed in all environments
 import type { FilterResult, FileFormat } from "pai-content-filter";
 import { BlackboardError } from "./errors";
 
@@ -61,7 +63,7 @@ export function ingestExternalContent(
 
   if (filterResult.decision === "BLOCKED") {
     const reasons = filterResult.matches
-      .map((m) => `${m.pattern_name} (${m.category})`)
+      .map((m: any) => `${m.pattern_name} (${m.category})`)
       .join(", ");
     throw new BlackboardError(
       `Content blocked by security filter: ${reasons || "policy violation"}`,
@@ -75,7 +77,7 @@ export function ingestExternalContent(
       metadata: {
         human_review_required: true,
         filter_decision: "HUMAN_REVIEW",
-        filter_matches: filterResult.matches.map((m) => ({
+        filter_matches: filterResult.matches.map((m: any) => ({
           pattern_id: m.pattern_id,
           category: m.category,
           severity: m.severity,

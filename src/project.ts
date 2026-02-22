@@ -297,7 +297,7 @@ export function getProjectDetail(
       completion_rate: totalWork > 0 ? Math.round((completedWork / totalWork) * 100) : 0,
       active_agents: activeAgents,
       total_agents: agents.length,
-      last_activity: events.length > 0 ? events[0].timestamp : null,
+      last_activity: events.length > 0 ? events[0]!.timestamp : null,
     },
   };
 }

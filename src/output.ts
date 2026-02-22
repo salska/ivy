@@ -33,14 +33,14 @@ export function formatTable(headers: string[], rows: string[][]): string {
 
   // Format header
   const headerLine = headers
-    .map((h, i) => h.padEnd(widths[i]))
+    .map((h, i) => h.padEnd(widths[i]!))
     .join("  ");
 
   const separator = widths.map((w) => "─".repeat(w)).join("──");
 
   // Format rows
   const dataLines = rows.map((row) =>
-    row.map((cell, i) => (cell ?? "").padEnd(widths[i])).join("  ")
+    row.map((cell, i) => (cell ?? "").padEnd(widths[i]!)).join("  ")
   );
 
   return [headerLine, separator, ...dataLines].join("\n");
