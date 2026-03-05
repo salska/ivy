@@ -1,25 +1,44 @@
 {
-  "name": "ivy-blackboard",
-  "version": "0.1.0",
-  "description": "Local agent blackboard — SQLite-based multi-agent coordination using the blackboard pattern",
+  "name": "ivy",
+  "version": "0.3.0",
+  "description": "ivy — Unified Personal AI Infrastructure: blackboard kernel + heartbeat runtime with plugin system and multi-brain support",
   "type": "module",
-  "main": "src/index.ts",
+  "main": "src/kernel/kernel.ts",
+  "module": "src/kernel/kernel.ts",
   "bin": {
-    "blackboard": "src/index.ts"
+    "ivy": "src/cli.ts",
+    "blackboard": "src/kernel/index.ts"
   },
   "scripts": {
-    "dev": "bun run src/index.ts",
+    "dev": "bun run src/cli.ts",
+    "serve": "lsof -ti:7878 | xargs kill -9 2>/dev/null || true; bun run src/cli.ts serve --dispatch",
     "test": "bun test",
-    "build": "./build.sh"
+    "typecheck": "bunx tsc --noEmit",
+    "ci": "bun test && bunx tsc --noEmit",
+    "build": "bun test && bunx tsc --noEmit && ./build.sh"
   },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jcfischer/ivy-blackboard.git"
+  },
+  "homepage": "https://github.com/jcfischer/ivy-blackboard",
+  "bugs": {
+    "url": "https://github.com/jcfischer/ivy-blackboard/issues"
+  },
+  "author": "Jens-Christian Fischer",
   "dependencies": {
     "commander": "^14.0.3",
+    "js-yaml": "^4.1.1",
     "pai-content-filter": "github:jcfischer/pai-content-filter",
     "zod": "^4.3.6"
   },
   "devDependencies": {
     "@types/bun": "latest",
+    "@types/js-yaml": "^4.0.9",
     "typescript": "^5.7"
   },
-  "license": "MIT"
+  "peerDependencies": {
+    "typescript": "^5"
+  }
 }

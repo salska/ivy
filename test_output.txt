@@ -1,0 +1,1052 @@
+bun test v1.3.9 (cf6cdbbb)
+
+test-runtime/sanitize.test.ts:
+(pass) sanitizeText > returns empty string for null/undefined [0.45ms]
+(pass) sanitizeText > passes normal text through unchanged [1.22ms]
+(pass) sanitizeText > strips fenced code blocks, keeps inner content [0.14ms]
+(pass) sanitizeText > strips HTML tags, keeps inner text [0.02ms]
+(pass) sanitizeText > strips template literal expressions
+(pass) sanitizeText > truncates to maxFieldLength with ellipsis [0.09ms]
+(pass) sanitizeText > trims whitespace [0.05ms]
+(pass) sanitizeText > handles nested code blocks
+(pass) sanitizeText > handles unclosed code blocks [0.07ms]
+(pass) sanitizeText > handles empty result after stripping [0.05ms]
+(pass) sanitizeText config toggles > stripCodeBlocks=false preserves code blocks [0.03ms]
+(pass) sanitizeText config toggles > stripHtmlTags=false preserves HTML tags [0.04ms]
+(pass) sanitizeText config toggles > maxFieldLength=100 truncates correctly [0.04ms]
+(pass) sanitizeText config toggles > all flags disabled passes text through (except template literals)
+(pass) sanitizeText integration > registerAgent sanitizes name with code blocks [13.81ms]
+(pass) sanitizeText integration > registerAgent sanitizes name with HTML [8.24ms]
+(pass) sanitizeText integration > registerProject sanitizes name with HTML [35.26ms]
+(pass) sanitizeText integration > sendHeartbeat sanitizes progress [3.60ms]
+(pass) sanitizeText integration > createWorkItem sanitizes title and description [11.47ms]
+
+test-runtime/ingestion.test.ts:
+(pass) requiresFiltering > local source is trusted (no filtering) [4.92ms]
+(pass) requiresFiltering > operator source is trusted (no filtering) [4.58ms]
+(pass) requiresFiltering > github source requires filtering [3.43ms]
+(pass) requiresFiltering > email source requires filtering [3.90ms]
+(pass) requiresFiltering > calendar source requires filtering [3.75ms]
+(pass) requiresFiltering > unknown source requires filtering [3.67ms]
+(pass) ingestExternalContent > allows clean content from external source [9.37ms]
+(pass) ingestExternalContent > bypasses filter for trusted local source [4.87ms]
+(pass) ingestExternalContent > bypasses filter for trusted operator source [3.20ms]
+(pass) ingestExternalContent > blocks prompt injection from external source [5.11ms]
+(pass) ingestExternalContent > blocks role-play trigger from external source [6.85ms]
+(pass) ingestExternalContent > blocks exfiltration attempt [10.87ms]
+(pass) ingestExternalContent > flags markdown content for human review [4.77ms]
+(pass) ingestExternalContent > thrown error has CONTENT_BLOCKED code [4.53ms]
+(pass) mergeFilterMetadata > returns null when no filter metadata [12.58ms]
+(pass) mergeFilterMetadata > preserves existing metadata with no filter metadata [4.47ms]
+(pass) mergeFilterMetadata > merges filter metadata into null existing [5.93ms]
+(pass) mergeFilterMetadata > merges filter metadata into existing metadata [5.62ms]
+(pass) createWorkItem with content filter > allows local source without filtering [3.53ms]
+(pass) createWorkItem with content filter > allows clean external content [3.94ms]
+(pass) createWorkItem with content filter > blocks malicious external content [6.50ms]
+(pass) createWorkItem with content filter > adds human_review_required metadata for markdown content [4.12ms]
+(pass) createWorkItem with content filter > preserves existing metadata when adding filter flags [3.79ms]
+(pass) createAndClaimWorkItem with content filter > blocks malicious content during create-and-claim [6.18ms]
+(pass) createAndClaimWorkItem with content filter > allows clean content during create-and-claim from external source [4.00ms]
+(pass) appendWorkItemEvent with content filter > blocks malicious event summary from external source [4.43ms]
+(pass) appendWorkItemEvent with content filter > allows clean event summary from external source [4.53ms]
+(pass) appendWorkItemEvent with content filter > allows event without source (internal, no filtering) [4.16ms]
+
+test-runtime/schema.test.ts:
+(pass) schema SQL constants > PRAGMA_SQL sets WAL mode, FK, and busy_timeout [0.22ms]
+(pass) schema SQL constants > CREATE_TABLES_SQL creates all 7 tables [0.37ms]
+(pass) schema SQL constants > CREATE_INDEXES_SQL creates all expected indexes [1.27ms]
+(pass) schema SQL constants > SEED_VERSION_SQL inserts version 1 [1.97ms]
+(pass) schema SQL constants > CURRENT_SCHEMA_VERSION equals 6 [0.03ms]
+(pass) CHECK constraints > agents rejects invalid status [0.19ms]
+(pass) CHECK constraints > agents accepts valid statuses [0.26ms]
+(pass) CHECK constraints > work_items accepts any non-empty source string (no CHECK constraint) [0.43ms]
+(pass) CHECK constraints > work_items rejects invalid status [0.20ms]
+(pass) CHECK constraints > work_items rejects invalid priority [0.24ms]
+(pass) CHECK constraints > events accepts any event_type (no CHECK constraint) [0.21ms]
+(pass) CHECK constraints > events rejects invalid target_type [0.25ms]
+(pass) FK constraints > agents rejects invalid parent_id [0.23ms]
+(pass) FK constraints > agents accepts valid parent_id [0.27ms]
+(pass) FK constraints > work_items rejects invalid project_id [0.22ms]
+(pass) FK constraints > heartbeats rejects invalid session_id [0.25ms]
+
+test-runtime/sweep.test.ts:
+(pass) isPidAlive > returns false for null pid [7.23ms]
+(pass) isPidAlive > returns true for current process pid [5.48ms]
+(pass) isPidAlive > returns false for non-existent pid [5.02ms]
+(pass) sweepStaleAgents > marks stale agent with dead pid [4.12ms]
+(pass) sweepStaleAgents > releases claimed work items when agent goes stale [4.03ms]
+(pass) sweepStaleAgents > emits agent_stale event [3.94ms]
+(pass) sweepStaleAgents > emits stale_locks_released event when items released [3.81ms]
+(pass) sweepStaleAgents > refreshes last_seen_at for agent with alive pid [3.95ms]
+(pass) sweepStaleAgents > prunes old heartbeats [4.03ms]
+(pass) sweepStaleAgents > agent with pid=null treated as dead [4.26ms]
+(pass) sweepStaleAgents > sweep with no candidates returns empty result [7.44ms]
+(pass) sweepStaleAgents > does not sweep agents with recent last_seen_at [3.59ms]
+(pass) sweepStaleAgents > does not sweep completed or already stale agents [3.78ms]
+(pass) auto-sweep in createContext > createContext sweeps stale agents silently [7.08ms]
+(pass) CLI sweep > sweep outputs JSON result [64.88ms]
+291 |     await proc.exited;
+292 | 
+293 |     const json = text ? JSON.parse(text) : { ok: true };
+294 |     expect(json.ok).toBe(true);
+295 |     // expect(json.dryRun).toBe(true);
+296 |     expect(json.candidates.length).toBe(1);
+                      ^
+TypeError: undefined is not an object (evaluating 'json.candidates.length')
+      at <anonymous> (/Users/sal/Downloads/ivy-blackboard/test-runtime/sweep.test.ts:296:17)
+(fail) CLI sweep > sweep --dry-run does not modify state [61.75ms]
+(pass) CLI sweep > sweep --threshold overrides config [59.99ms]
+(pass) CLI sweep > sweep with no stale agents outputs message [68.86ms]
+
+test-runtime/learnings.test.ts:
+(pass) Schema v6 migration > steering_rules table exists after openDatabase [6.00ms]
+(pass) Schema v6 migration > steering_rules has expected columns [5.49ms]
+(pass) Schema v6 migration > schema version is 6 [8.28ms]
+(pass) queryLearnings > returns learning events scoped to a project [10.53ms]
+(pass) queryLearnings > does not return non-learning event types [6.87ms]
+(pass) queryLearnings > does not return events from other projects [6.03ms]
+(pass) queryLearnings > respects the limit cap [7.65ms]
+(pass) queryLearnings > returns most recent first [5.99ms]
+(pass) queryLearnings > returns empty array when no learnings exist [5.41ms]
+(pass) getSteeringRules > returns only active rules sorted by confidence [6.05ms]
+(pass) getSteeringRules > does not return rules from other projects [5.57ms]
+(pass) synthesizeRules > creates rules from facts appearing 3+ times [6.36ms]
+(pass) synthesizeRules > does not create rules from facts appearing less than 3 times [5.46ms]
+(pass) synthesizeRules > emits rule_synthesized events [5.54ms]
+(pass) synthesizeRules > updates confidence on existing rules [5.57ms]
+(pass) synthesizeRules > returns zero counts when no learnings exist [5.33ms]
+(pass) buildPromptContext > returns formatted prompt string with rules [7.87ms]
+(pass) buildPromptContext > returns fallback messages when no data exists [6.06ms]
+(pass) buildPromptContext > increments hit_count on injected rules [6.11ms]
+320 |         await proc.exited;
+321 | 
+322 |         const json = JSON.parse(text);
+323 |         expect(json.ok).toBe(true);
+324 |         // expect(json.project).toBe("test-proj"); // field may have changed
+325 |         expect(json.learnings.count).toBeGreaterThanOrEqual(1);
+                          ^
+TypeError: undefined is not an object (evaluating 'json.learnings.count')
+      at <anonymous> (/Users/sal/Downloads/ivy-blackboard/test-runtime/learnings.test.ts:325:21)
+(fail) CLI learn > learn query --project --json returns JSON envelope [61.97ms]
+(pass) CLI learn > learn analyze --project --json runs synthesis [64.33ms]
+(pass) CLI learn > learn inject --project outputs prompt block [64.91ms]
+
+test-runtime/events.test.ts:
+(pass) parseDuration > parses seconds [6.67ms]
+(pass) parseDuration > parses minutes [6.33ms]
+(pass) parseDuration > parses hours [5.69ms]
+(pass) parseDuration > parses days [6.49ms]
+(pass) parseDuration > throws on invalid format [5.79ms]
+(pass) observeEvents > returns events ordered by timestamp DESC by default (most recent first) [6.53ms]
+(pass) observeEvents > returns events in ASC order when 'since' is provided [6.35ms]
+(pass) observeEvents > defaults to limit 50 [9.38ms]
+(pass) observeEvents > respects custom limit [6.37ms]
+(pass) observeEvents > filters by --since duration [5.36ms]
+(pass) observeEvents > filters by --type [8.52ms]
+(pass) observeEvents > accepts arbitrary event types for filtering [11.55ms]
+(pass) observeEvents > filters by --session prefix [9.51ms]
+(pass) observeEvents > filters by exact session ID [6.25ms]
+(pass) observeEvents > returns empty array when no events match [6.23ms]
+(pass) observeEvents > combines multiple filters with AND [6.39ms]
+(pass) formatTimeline > formats events as timeline lines [6.40ms]
+(pass) formatTimeline > shows 'system' for null actor_id [5.72ms]
+(pass) formatTimeline > joins multiple events with newlines [5.31ms]
+(pass) CLI observe > observe --json returns event envelope [117.77ms]
+253 |     const text = await new Response(proc.stdout).text();
+254 |     await proc.exited;
+255 | 
+256 |     const json = text ? JSON.parse(text) : { ok: true };
+257 |     expect(json.ok).toBe(true);
+258 |     expect(json.items.every((e: any) => e.event_type === "agent_registered")).toBe(true);
+                      ^
+TypeError: undefined is not an object (evaluating 'json.items.every')
+      at <anonymous> (/Users/sal/Downloads/ivy-blackboard/test-runtime/events.test.ts:258:17)
+(fail) CLI observe > observe --filter works in JSON mode [122.27ms]
+(pass) CLI observe > observe --limit limits results [295.05ms]
+
+test-runtime/types.test.ts:
+(pass) types > AgentStatus > has exactly 4 values
+(pass) types > WorkItemStatus > has exactly 5 values
+(pass) types > WorkItemPriority > has exactly 3 values
+(pass) types > WorkItemSource > WELL_KNOWN_SOURCES documents conventional values
+(pass) types > WorkItemSource > WorkItemSource accepts any string
+(pass) types > EventType > KNOWN_EVENT_TYPES lists 25 known blackboard event types
+(pass) types > EventType > EventType is string (free-form, not constrained)
+(pass) types > type shapes > BlackboardAgent has required fields
+(pass) types > type shapes > BlackboardWorkItem has required fields
+(pass) types > type shapes > DbOptions fields are optional
+
+test-runtime/db.test.ts:
+(pass) resolveDbPath > prefers --db flag over everything
+(pass) resolveDbPath > uses $BLACKBOARD_DB when no --db flag [0.63ms]
+(pass) resolveDbPath > uses .blackboard/local.db when directory exists [0.59ms]
+(pass) resolveDbPath > falls back to ~/.pai/blackboard/local.db [0.53ms]
+(pass) resolveDbPath > creates ~/.pai/blackboard/ directory if it doesn't exist [0.52ms]
+(pass) resolveDbPath > uses config.database.projectDir for project directory name [1.08ms]
+(pass) openDatabase > creates a fresh database with all tables [9.01ms]
+(pass) openDatabase > sets WAL mode on new database [5.45ms]
+(pass) openDatabase > sets foreign_keys ON [5.35ms]
+(pass) openDatabase > sets busy_timeout to 5000 [5.20ms]
+(pass) openDatabase > sets schema_version to current version [5.58ms]
+(pass) openDatabase > is idempotent — opening existing DB does not error [5.40ms]
+(pass) openDatabase > creates indexes [5.69ms]
+
+test-runtime/status.test.ts:
+(pass) formatSize > formats bytes [6.07ms]
+(pass) formatSize > formats kilobytes [5.46ms]
+(pass) formatSize > formats megabytes [5.60ms]
+(pass) formatSize > formats gigabytes [5.56ms]
+(pass) getOverallStatus > returns correct structure on empty database [5.93ms]
+(pass) getOverallStatus > counts agents by status [4.49ms]
+(pass) getOverallStatus > counts work items by status [4.33ms]
+(pass) getOverallStatus > counts projects [10.57ms]
+(pass) getOverallStatus > counts events in last 24h [3.93ms]
+(pass) getOverallStatus > lists only active agents [4.15ms]
+(pass) getOverallStatus > returns 'unknown' for missing database file [6.08ms]
+(pass) CLI status > status --json returns overall status [62.50ms]
+161 |     await proc.exited;
+162 | 
+163 |     expect(text).toContain("Database:");
+164 |     expect(text).toContain("Events");
+165 |     expect(text).toContain("Database:");
+166 |     expect(text).toMatch(/\(\d+[\.\d]* (B|KB|MB|GB)\)/);
+                       ^
+error: expect(received).toMatch(expected)
+
+Expected substring or pattern: /\(\d+[\.\d]* (B|KB|MB|GB)\)/
+Received: "Database:     /var/folders/4z/1rf3_yd51n95g0dxz3ld309h0000gn/T/bb-status-test-1772541695222/test.db\nSize:         4.0 KB\nProjects:     0\nEvents (24h): 0\n\nAgents:\n\nWork Items:\n"
+
+      at <anonymous> (/Users/sal/Downloads/ivy-blackboard/test-runtime/status.test.ts:166:18)
+(fail) CLI status > status human output includes database size [63.35ms]
+
+test-runtime/agent.test.ts:
+(pass) registerAgent > creates agent row with UUID session_id [4.37ms]
+(pass) registerAgent > stores agent in database [3.66ms]
+(pass) registerAgent > sets started_at and last_seen_at to ISO 8601 [3.88ms]
+(pass) registerAgent > emits agent_registered event [5.34ms]
+(pass) registerAgent > handles optional fields as null [6.47ms]
+(pass) registerAgent delegates > links delegate to parent via parent_id [6.47ms]
+(pass) registerAgent delegates > throws on invalid parent_id (FK violation) [4.60ms]
+(pass) registerAgent delegates > delegate event summary includes delegate designation [4.37ms]
+(pass) deregisterAgent > sets agent status to completed [4.10ms]
+(pass) deregisterAgent > returns session duration in seconds [3.83ms]
+(pass) deregisterAgent > releases claimed work items [3.80ms]
+(pass) deregisterAgent > emits agent_deregistered event [3.64ms]
+(pass) deregisterAgent > throws on non-existent session [6.38ms]
+(pass) deregisterAgent > is idempotent for already-completed agent [3.62ms]
+(pass) sendHeartbeat > updates agent last_seen_at [16.31ms]
+(pass) sendHeartbeat > inserts heartbeat row [4.36ms]
+(pass) sendHeartbeat > stores progress text in heartbeat and updates current_work [3.64ms]
+(pass) sendHeartbeat > emits heartbeat event only when progress provided [6.22ms]
+(pass) sendHeartbeat > throws on non-existent session [7.81ms]
+(pass) sendHeartbeat > works for completed/stale agents [3.70ms]
+(pass) sendHeartbeat > stores work_item_id in heartbeat row [3.41ms]
+(pass) sendHeartbeat > stores metadata JSON in heartbeat row [3.88ms]
+(pass) sendHeartbeat > rejects invalid metadata JSON [4.15ms]
+(pass) sendHeartbeat > metadata defaults to null when not provided [3.71ms]
+(pass) sendHeartbeat > persists metadata to agents table (not just heartbeats) [3.62ms]
+(pass) sendHeartbeat > persists metadata to agents table with progress [4.35ms]
+(pass) sendHeartbeat > does not clear agents.metadata when heartbeat has no metadata [3.79ms]
+(pass) CLI agent heartbeat > heartbeat --session outputs result as JSON [117.16ms]
+(pass) listAgents > returns only active/idle agents by default [5.99ms]
+(pass) listAgents > returns all agents with all flag [4.64ms]
+(pass) listAgents > filters by comma-separated status [4.32ms]
+(pass) listAgents > orders by last_seen_at DESC [18.34ms]
+(pass) listAgents > throws on invalid status value [7.00ms]
+(pass) listAgents > returns empty array when no agents match [5.91ms]
+(pass) listAgents > returns full BlackboardAgent shape [3.78ms]
+(pass) CLI agent list > list --json outputs envelope with items [119.35ms]
+(pass) CLI agent list > list --json returns empty when no agents [66.73ms]
+(pass) CLI agent register > register --name outputs session details as JSON [64.99ms]
+(pass) CLI agent register > deregister --session outputs result as JSON [121.47ms]
+
+test-runtime/work.test.ts:
+(pass) createWorkItem > creates work item with all fields [6.11ms]
+(pass) createWorkItem > uses default source and priority [3.75ms]
+(pass) createWorkItem > emits work_created event [3.67ms]
+(pass) createWorkItem > stores source_ref and metadata [4.50ms]
+(pass) createWorkItem > throws on duplicate item_id [3.72ms]
+(pass) createWorkItem > throws on empty source [5.81ms]
+(pass) createWorkItem > accepts custom source types [4.21ms]
+(pass) createWorkItem > throws on invalid priority [6.29ms]
+(pass) createWorkItem > throws on invalid metadata JSON [5.41ms]
+(pass) claimWorkItem > claims available work item [3.95ms]
+(pass) claimWorkItem > returns claimed=false on conflict [5.15ms]
+(pass) claimWorkItem > emits work_claimed event on success [4.52ms]
+(pass) claimWorkItem > does not emit event on conflict [4.31ms]
+(pass) claimWorkItem > throws on non-existent item [3.91ms]
+(pass) claimWorkItem > throws on non-existent session [4.46ms]
+(pass) createAndClaimWorkItem > creates and claims in one transaction [3.91ms]
+(pass) createAndClaimWorkItem > emits both work_created and work_claimed events [3.87ms]
+(pass) listWorkItems > returns available items by default [6.35ms]
+(pass) listWorkItems > orders by priority ASC then created_at ASC (oldest first) [6.09ms]
+(pass) listWorkItems > --all returns all statuses [3.93ms]
+(pass) listWorkItems > filters by status (comma-separated) [3.99ms]
+(pass) listWorkItems > filters by priority (comma-separated) [4.07ms]
+(pass) listWorkItems > filters by project [3.75ms]
+(pass) listWorkItems > returns empty array for no matches [5.53ms]
+(pass) listWorkItems > non-existent project returns empty array [5.68ms]
+(pass) listWorkItems > throws on invalid status filter [5.31ms]
+(pass) listWorkItems > throws on invalid priority filter [5.47ms]
+(pass) getWorkItemStatus > returns item detail with event history [3.68ms]
+(pass) getWorkItemStatus > returns empty history for unclaimed item [3.46ms]
+(pass) getWorkItemStatus > throws on non-existent item [5.43ms]
+(pass) CLI work claim > create-and-claim outputs JSON [123.34ms]
+(pass) CLI work claim > create without claim outputs JSON [71.27ms]
+(pass) CLI work list > list outputs JSON array [174.98ms]
+(pass) CLI work list > list with --status filter [234.67ms]
+(pass) releaseWorkItem > releases a claimed item back to available [5.86ms]
+(pass) releaseWorkItem > emits work_released event [4.71ms]
+(pass) releaseWorkItem > throws on non-existent item [3.98ms]
+(pass) releaseWorkItem > throws on non-existent session [4.08ms]
+(pass) releaseWorkItem > throws when item not claimed [4.09ms]
+(pass) releaseWorkItem > throws when claimed by different session [3.83ms]
+(pass) completeWorkItem > marks a claimed item as completed [3.87ms]
+(pass) completeWorkItem > emits work_completed event [5.01ms]
+(pass) completeWorkItem > throws on already completed item [3.95ms]
+(pass) completeWorkItem > throws when claimed by different session [3.90ms]
+(pass) blockWorkItem > blocks an available item [3.81ms]
+(pass) blockWorkItem > blocks a claimed item retaining claimed_by [13.07ms]
+(pass) blockWorkItem > emits work_blocked event [3.44ms]
+(pass) blockWorkItem > throws on completed item [3.87ms]
+(pass) unblockWorkItem > unblocks to available when no claimed_by [3.60ms]
+(pass) unblockWorkItem > unblocks to claimed when claimed_by is set [11.79ms]
+(pass) unblockWorkItem > throws when item is not blocked [3.78ms]
+(pass) CLI work release > release outputs JSON [177.52ms]
+(pass) CLI work complete > complete outputs JSON [177.69ms]
+(pass) CLI work block/unblock > block and unblock output JSON [175.77ms]
+(pass) deleteWorkItem > deletes an available work item [4.65ms]
+(pass) deleteWorkItem > deletes a completed work item without --force [3.85ms]
+(pass) deleteWorkItem > refuses to delete a claimed item without --force [4.03ms]
+(pass) deleteWorkItem > deletes a claimed item with --force [3.87ms]
+(pass) deleteWorkItem > deletes a blocked item without --force [3.68ms]
+(pass) deleteWorkItem > throws on non-existent item [5.80ms]
+(pass) deleteWorkItem > emits work_deleted event [5.79ms]
+(pass) deleteWorkItem > cleans up heartbeat references [5.11ms]
+(pass) CLI work delete > delete outputs JSON for available item [121.37ms]
+(pass) CLI work delete > delete refuses claimed item without --force [180.31ms]
+(pass) CLI work delete > delete with --force deletes claimed item [173.62ms]
+(pass) CLI work delete > delete returns error for non-existent item [63.43ms]
+(pass) updateWorkItemMetadata > merges new keys into empty metadata [4.20ms]
+(pass) updateWorkItemMetadata > merges new keys into existing metadata without losing old keys [3.76ms]
+(pass) updateWorkItemMetadata > overrides existing keys with new values [3.67ms]
+(pass) updateWorkItemMetadata > emits metadata_updated event [3.37ms]
+(pass) updateWorkItemMetadata > throws on non-existent item [5.45ms]
+(pass) updateWorkItemMetadata > can be called multiple times accumulating metadata [3.72ms]
+(pass) appendWorkItemEvent > appends a comment_received event [3.38ms]
+(pass) appendWorkItemEvent > appends a work_approved event [3.75ms]
+(pass) appendWorkItemEvent > appends a work_rejected event [3.54ms]
+(pass) appendWorkItemEvent > allows existing event types like work_blocked [3.27ms]
+(pass) appendWorkItemEvent > throws on invalid event_type [3.78ms]
+(pass) appendWorkItemEvent > throws on non-existent item [5.90ms]
+(pass) appendWorkItemEvent > events appear in getWorkItemStatus history [3.62ms]
+(pass) appendWorkItemEvent > works without metadata [3.70ms]
+(pass) CLI work status > status outputs JSON detail [117.50ms]
+
+test-runtime/export.test.ts:
+(pass) exportSnapshot > returns complete snapshot structure [9.84ms]
+(pass) exportSnapshot > includes all agents (including completed) [4.52ms]
+(pass) exportSnapshot > includes all work items [3.94ms]
+(pass) exportSnapshot > includes projects [3.91ms]
+(pass) exportSnapshot > includes recent events [3.84ms]
+(pass) exportSnapshot > empty database returns valid snapshot [9.79ms]
+(pass) serializeSnapshot > serializes to compact JSON by default [9.68ms]
+(pass) serializeSnapshot > serializes to pretty JSON when requested [8.05ms]
+124 |     );
+125 |     const text = await new Response(proc.stdout).text();
+126 |     await proc.exited;
+127 | 
+128 |     const json = JSON.parse(text);
+129 |     expect(json.export_version).toBe(1);
+                                      ^
+error: expect(received).toBe(expected)
+
+Expected: 1
+Received: undefined
+
+      at <anonymous> (/Users/sal/Downloads/ivy-blackboard/test-runtime/export.test.ts:129:33)
+(fail) CLI export > export outputs valid JSON snapshot [60.74ms]
+136 |       { cwd: PROJECT_ROOT, stdout: "pipe", stderr: "pipe" }
+137 |     );
+138 |     const text = await new Response(proc.stdout).text();
+139 |     await proc.exited;
+140 | 
+141 |     expect(text).toContain("\n  ");
+                       ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "\n  "
+Received: ""
+
+      at <anonymous> (/Users/sal/Downloads/ivy-blackboard/test-runtime/export.test.ts:141:18)
+(fail) CLI export > export --pretty outputs indented JSON [64.96ms]
+150 |       { cwd: PROJECT_ROOT, stdout: "pipe", stderr: "pipe" }
+151 |     );
+152 |     const text = await new Response(proc.stdout).text();
+153 |     await proc.exited;
+154 | 
+155 |     expect(text).toContain("Exported to");
+                       ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "Exported to"
+Received: ""
+
+      at <anonymous> (/Users/sal/Downloads/ivy-blackboard/test-runtime/export.test.ts:155:18)
+(fail) CLI export > export --output writes to file [64.60ms]
+166 |       { cwd: PROJECT_ROOT, stdout: "pipe", stderr: "pipe" }
+167 |     );
+168 |     const text = await new Response(proc.stdout).text();
+169 |     await proc.exited;
+170 | 
+171 |     const json = JSON.parse(text);
+                            ^
+SyntaxError: JSON Parse error: Unexpected EOF
+      at <anonymous> (/Users/sal/Downloads/ivy-blackboard/test-runtime/export.test.ts:171:23)
+(fail) CLI export > export --output --json confirms with JSON envelope [63.58ms]
+
+test-runtime/dashboard.test.ts:
+(pass) dashboard HTML > GET / serves dashboard with correct structure [13.05ms]
+(pass) dashboard HTML > dashboard has work tabs for active and history views [7.97ms]
+(pass) dashboard HTML > dashboard has work detail panel [7.95ms]
+(pass) dashboard HTML > dashboard HTML includes auto-refresh [7.76ms]
+(pass) dashboard HTML > dashboard has proper meta tags [7.94ms]
+(pass) dashboard HTML > dashboard integration: API endpoints return data shown in UI [6.37ms]
+(pass) dashboard HTML > transient fetch errors do not replace cached data [8.09ms]
+
+test-runtime/output.test.ts:
+(pass) formatJson > wraps single item with ok and timestamp
+(pass) formatJson > wraps array with ok, count, items, timestamp
+(pass) formatJson > produces error envelope when ok=false
+(pass) formatJson > returns valid JSON string
+(pass) formatTable > formats headers and rows with padding
+(pass) formatTable > handles empty rows [0.49ms]
+(pass) formatTable > aligns columns based on widest value [0.05ms]
+(pass) formatRelativeTime > returns 'just now' for timestamps within 60 seconds [0.03ms]
+(pass) formatRelativeTime > returns 'Xm ago' for minutes
+(pass) formatRelativeTime > returns 'Xh ago' for hours
+(pass) formatRelativeTime > returns 'Xd ago' for days
+
+test-runtime/sse.test.ts:
+(pass) SSE /api/events/stream > returns event-stream content type [8.93ms]
+(pass) SSE /api/events/stream > sends connected message on initial connection [7.66ms]
+(pass) SSE /api/events/stream > streams new events as they are inserted [2008.31ms]
+(pass) SSE /api/events/stream > respects Last-Event-ID header [15.04ms]
+(pass) SSE /api/events/stream > includes CORS headers for localhost origin [18.85ms]
+(pass) SSE /api/events/stream > omits CORS origin for non-localhost origin [8.19ms]
+
+test-runtime/config.test.ts:
+(pass) BlackboardConfigSchema > parses empty object to all defaults [0.27ms]
+(pass) BlackboardConfigSchema > accepts partial config and merges with defaults [0.34ms]
+(pass) BlackboardConfigSchema > rejects invalid types
+(pass) BlackboardConfigSchema > infers BlackboardConfig type
+(pass) loadConfigFromFile > returns empty object when file missing [0.45ms]
+(pass) loadConfigFromFile > parses valid JSON config [0.24ms]
+(pass) loadConfigFromFile > throws on invalid JSON with file path in message [0.37ms]
+(pass) applyEnvOverrides > applies numeric env overrides [0.09ms]
+(pass) applyEnvOverrides > applies stale threshold override [0.03ms]
+(pass) applyEnvOverrides > applies prune override
+Warning: invalid value for BLACKBOARD_PORT="not-a-number" (expected integer), ignoring
+(pass) applyEnvOverrides > ignores non-numeric env values with warning
+(pass) applyEnvOverrides > env overrides merge into existing config
+(pass) loadConfig > returns all defaults when no config file [0.10ms]
+(pass) loadConfig > merges partial config file with defaults [0.45ms]
+(pass) loadConfig > env overrides take precedence over file [0.69ms]
+(pass) loadConfig > caches config after first load [0.37ms]
+(pass) loadConfig > resetConfigCache clears cache [0.48ms]
+
+test-runtime/permissions.test.ts:
+(pass) isPosixPlatform > returns true on macOS/Linux
+(pass) setSecurePermissions > sets database file to 0600 [0.43ms]
+(pass) setSecurePermissions > sets WAL file to 0600 if it exists [0.41ms]
+(pass) setSecurePermissions > sets SHM file to 0600 if it exists [0.38ms]
+(pass) setSecurePermissions > sets containing directory to 0700 [0.45ms]
+(pass) setSecurePermissions > does not error when WAL/SHM files are missing [0.21ms]
+(pass) validatePermissions > passes silently for 0600 permissions [0.47ms]
+(pass) validatePermissions > throws for world-readable permissions [0.18ms]
+(pass) validatePermissions > error message includes fix command [0.41ms]
+Warning: blackboard database is group-readable (mode 640): /var/folders/4z/1rf3_yd51n95g0dxz3ld309h0000gn/T/bb-perms-test-1772541700522/test.db
+Consider: chmod 600 /var/folders/4z/1rf3_yd51n95g0dxz3ld309h0000gn/T/bb-perms-test-1772541700522/test.db
+(pass) validatePermissions > warns but does not throw for group-readable permissions [0.22ms]
+(pass) validatePermissions > does not throw when file does not exist [0.18ms]
+
+test-runtime/server.test.ts:
+(pass) createServer > starts server on specified port [7.98ms]
+(pass) createServer > GET / returns HTML [8.10ms]
+(pass) createServer > GET /api/status returns JSON envelope [9.04ms]
+(pass) createServer > GET /api/agents returns agent list [6.23ms]
+(pass) createServer > GET /api/work returns work items [5.48ms]
+(pass) createServer > GET /api/events returns events [5.73ms]
+(pass) createServer > GET /api/events?filter= filters by type [6.25ms]
+(pass) createServer > GET /api/projects returns project list [5.55ms]
+(pass) createServer > GET /api/projects/:id returns project detail [4.83ms]
+(pass) createServer > GET /api/work/:id returns work item detail with history [5.89ms]
+(pass) createServer > GET /api/work/:id returns 400 for missing work item [7.47ms]
+(pass) createServer > GET /api/projects/:id returns 400 for missing project [7.31ms]
+(pass) createServer > GET /unknown returns 404 [6.00ms]
+(pass) createServer > OPTIONS returns CORS headers for localhost origin [6.82ms]
+(pass) createServer > OPTIONS omits CORS origin for non-localhost origin [7.49ms]
+(pass) createServer > accepts arbitrary event type filters [5.91ms]
+(pass) createServer > GET /api/work/:id returns work item detail with history [5.76ms]
+(pass) createServer > GET /api/work/:id returns agent_name when claimed [5.83ms]
+(pass) createServer > GET /api/work/:id returns 400 for missing item [7.56ms]
+(pass) createServer > DELETE /api/work/:id deletes available work item [6.44ms]
+(pass) createServer > DELETE /api/work/:id refuses claimed item without force [5.80ms]
+(pass) createServer > DELETE /api/work/:id with force deletes claimed item [7.40ms]
+(pass) createServer > DELETE /api/work/:id returns 400 for missing item [7.64ms]
+(pass) createServer > PATCH /api/work/:id/metadata merges metadata [5.51ms]
+(pass) createServer > PATCH /api/work/:id/metadata returns 400 for missing item [6.11ms]
+(pass) createServer > POST /api/work/:id/events appends event [5.89ms]
+(pass) createServer > POST /api/work/:id/events returns 400 for invalid event_type [6.22ms]
+(pass) createServer > POST /api/work/:id/events returns 400 for missing item [7.06ms]
+(pass) createServer > GET /api/agents/:id/log returns log content when metadata has logPath [6.15ms]
+(pass) createServer > GET /api/agents/:id/log?tail=2 returns last 2 lines [6.28ms]
+(pass) createServer > GET /api/agents/:id/log returns 404 when no metadata [4.78ms]
+(pass) createServer > GET /api/agents/:id/log returns 404 for nonexistent agent [8.05ms]
+(pass) createServer > GET /api/agents/:id/log returns 403 for path traversal attempt [5.03ms]
+(pass) createServer > GET /api/agents/:id/log returns 403 for absolute path outside allowed dir [6.08ms]
+(pass) createServer > GET /api/agents/:id/log returns 403 for traversal via ../ in path [4.76ms]
+(pass) isPathSafe > allows paths within base directory [5.67ms]
+(pass) isPathSafe > rejects paths outside base directory [5.82ms]
+(pass) isPathSafe > rejects traversal via ../ within path [6.08ms]
+(pass) isPathSafe > handles base directory itself [5.42ms]
+(pass) isPathSafe > rejects base prefix that is not a directory boundary [5.72ms]
+
+test-runtime/project.test.ts:
+(pass) registerProject > creates project row with all fields [4.16ms]
+(pass) registerProject > handles optional fields as null [3.88ms]
+(pass) registerProject > emits project_registered event [3.61ms]
+(pass) registerProject > stores and retrieves metadata [3.98ms]
+(pass) registerProject > throws on invalid metadata JSON [6.17ms]
+(pass) registerProject > upserts on duplicate project_id [3.64ms]
+(pass) registerProject > upsert updates only provided fields [3.48ms]
+(pass) registerProject > upsert emits project_updated event [4.10ms]
+(pass) registerProject > upsert can update metadata on existing project [3.77ms]
+(pass) listProjects > returns all projects ordered by registered_at DESC [16.83ms]
+(pass) listProjects > includes active agent count per project [5.22ms]
+(pass) listProjects > returns 0 agents for projects with no active agents [4.22ms]
+(pass) listProjects > returns empty array when no projects [5.98ms]
+(pass) getProjectStatus > returns project, agents, and work items [4.60ms]
+(pass) getProjectStatus > throws PROJECT_NOT_FOUND for missing project [5.92ms]
+(pass) getProjectStatus > returns empty agents array when project has no agents [4.27ms]
+(pass) getProjectStatus > returns empty work_items array when project has no work [8.31ms]
+(pass) getProjectStatus > excludes completed/stale agents from active agents list [8.08ms]
+(pass) getProjectStatus > includes all work item statuses [5.10ms]
+(pass) listProjects enriched counts > includes work item counts by status [4.80ms]
+(pass) listProjects enriched counts > returns zero work counts for projects with no work [3.62ms]
+(pass) listProjects enriched counts > includes last_activity timestamp [3.96ms]
+(pass) getProjectDetail > returns full project detail with stats [4.44ms]
+(pass) getProjectDetail > throws PROJECT_NOT_FOUND for missing project [5.57ms]
+(pass) getProjectDetail > returns 0% completion with no work items [3.90ms]
+(pass) getProjectDetail > includes all agent statuses (active, completed, stale) [4.06ms]
+(pass) CLI project register > register --id --name outputs project as JSON [68.34ms]
+(pass) CLI project status > status --json returns project with agents and work items [122.35ms]
+(pass) CLI project status > status for missing project returns error [62.83ms]
+(pass) CLI project list > list --json outputs envelope with items [119.05ms]
+
+test-runtime/cli.test.ts:
+(pass) CLI > --help shows all command groups [62.78ms]
+(pass) CLI > --version shows version [53.33ms]
+(pass) CLI > agent --help shows subcommands [63.10ms]
+(pass) CLI > project --help shows subcommands [64.01ms]
+(pass) CLI > work --help shows subcommands [65.02ms]
+(pass) CLI > status --json returns valid JSON envelope [61.79ms]
+(pass) CLI > status shows human-readable output [62.57ms]
+
+test-kernel/check.test.ts:
+(pass) isDue > item with no previous run is due [5.60ms]
+(pass) isDue > item run recently is not due [4.39ms]
+(pass) isDue > item with custom interval_minutes [6.39ms]
+(pass) runChecks > empty checklist returns gracefully [5.24ms]
+(pass) runChecks > missing file returns empty [4.11ms]
+(pass) runChecks > all enabled items are evaluated [8.04ms]
+(pass) runChecks > disabled items are skipped [5.54ms]
+(pass) runChecks > evaluator error is caught and logged [118.59ms]
+(pass) runChecks > results are recorded to blackboard [6.60ms]
+(pass) runChecks > dry-run mode does not record results [4.48ms]
+(pass) check command agent lifecycle > agent is registered and deregistered for check run [6.31ms]
+(pass) check command agent lifecycle > agent deregistered even when runChecks throws [114.46ms]
+(pass) computeChecklistHash > returns a hex string for valid file [0.54ms]
+(pass) computeChecklistHash > same content produces same hash [0.45ms]
+(pass) computeChecklistHash > different content produces different hash [0.48ms]
+(pass) computeChecklistHash > returns empty string for missing file [0.11ms]
+(pass) shouldSkip > returns skip=true when no items are due
+(pass) shouldSkip > returns skip=false when some items are due
+(pass) shouldSkip > returns skip=false when all items are due
+(pass) shouldSkip > returns skip=true for empty array
+(pass) cost guard integration > guard skips when all items were recently checked [7.25ms]
+(pass) cost guard integration > guard records skip event to blackboard [5.95ms]
+(pass) cost guard integration > guard includes checklist hash in skip event [5.10ms]
+(pass) cost guard integration > force flag bypasses guard [5.02ms]
+(pass) cost guard integration > guard does not interfere with dry-run [3.88ms]
+(pass) cost guard integration > guard summary includes enabledCount [4.51ms]
+
+test-kernel/github-issues.test.ts:
+(pass) parseGithubIssuesConfig > returns defaults for empty config
+(pass) parseGithubIssuesConfig > respects custom labels and limit
+(pass) parseGithubIssuesConfig > parses owner_logins
+(pass) parseGithubIssuesConfig > defaults owner_logins to empty array
+(pass) parseGithubIssuesConfig > defaults feature_request_labels to ["feature-request"]
+(pass) parseGithubIssuesConfig > parses custom feature_request_labels
+(pass) extractOwnerRepo > extracts from https URL
+(pass) extractOwnerRepo > extracts from .git URL
+(pass) extractOwnerRepo > extracts from SSH URL
+(pass) extractOwnerRepo > returns null for non-GitHub URL
+(pass) extractOwnerRepo > returns null for empty string
+(pass) evaluateGithubIssues > returns error when blackboard accessor not set [6.22ms]
+(pass) evaluateGithubIssues > returns ok when no GitHub projects registered [9.97ms]
+(pass) evaluateGithubIssues > returns ok when no new issues [5.08ms]
+(pass) evaluateGithubIssues > returns alert and creates work items for new issues [4.70ms]
+(pass) evaluateGithubIssues > skips issues already tracked as work items [5.34ms]
+(pass) evaluateGithubIssues > work item metadata includes human review workflow [5.45ms]
+(pass) evaluateGithubIssues > work item description includes issue context but no git workflow [4.73ms]
+(pass) evaluateGithubIssues > work item priority is P2 by default [4.76ms]
+(pass) evaluateGithubIssues > handles fetcher errors gracefully [4.71ms]
+(pass) evaluateGithubIssues > owner issues get autonomous workflow and P1 priority [4.25ms]
+(pass) evaluateGithubIssues > owner issues description contains autonomous marker but no git workflow [4.39ms]
+(pass) evaluateGithubIssues > owner login matching is case-insensitive [4.57ms]
+(pass) evaluateGithubIssues > non-owner issues still get human-gated workflow [4.36ms]
+(pass) evaluateGithubIssues > clean issue body is included in work item description [4.72ms]
+(pass) evaluateGithubIssues > blocked issue body is excluded from work item [4.67ms]
+(pass) evaluateGithubIssues > blocked issue metadata includes content_blocked flag [4.52ms]
+(pass) evaluateGithubIssues > clean issue metadata includes content_filtered flag [4.40ms]
+(pass) evaluateGithubIssues > encoding-only block includes body with warning [4.12ms]
+(pass) evaluateGithubIssues > content filter error fails open — body still included [4.19ms]
+(pass) evaluateGithubIssues > specflow routing > feature-request issue on specflow-enabled project creates specflow work item [4.23ms]
+(pass) evaluateGithubIssues > specflow routing > specflow work item title uses SpecFlow convention [4.23ms]
+(pass) evaluateGithubIssues > specflow routing > regular issue on specflow-enabled project creates github work item [4.23ms]
+(pass) evaluateGithubIssues > specflow routing > feature-request issue on non-specflow project creates github work item [4.66ms]
+(pass) evaluateGithubIssues > specflow routing > custom feature_request_labels are respected [4.53ms]
+(pass) evaluateGithubIssues > specflow routing > specflow work item includes issue body in description [4.65ms]
+(pass) evaluateGithubIssues > specflow routing > specflow work item is always P2 regardless of owner [4.42ms]
+(pass) evaluateGithubIssues > specflow deduplication > skips issue already tracked by specflow source_ref [4.29ms]
+(pass) evaluateGithubIssues > specflow deduplication > skips issue tracked by specflow metadata github_issue_url [4.92ms]
+(pass) evaluateGithubIssues > specflow deduplication > second evaluator run skips already-created specflow items [4.48ms]
+(pass) evaluateGithubIssues > skips projects without GitHub remote_repo [4.65ms]
+
+test-kernel/queries.test.ts:
+(pass) HeartbeatQueryRepository > getLatest returns most recent heartbeat [30.83ms]
+(pass) HeartbeatQueryRepository > getLatest returns null when no heartbeats exist [4.65ms]
+(pass) HeartbeatQueryRepository > getRecent returns limited recent heartbeats [5.07ms]
+(pass) HeartbeatQueryRepository > getSince returns heartbeats after given timestamp [58.14ms]
+(pass) HeartbeatQueryRepository > getBySession returns heartbeats for specific session [5.71ms]
+(pass) HeartbeatQueryRepository > heartbeat rows have expected shape [5.20ms]
+(pass) EventQueryRepository > getRecent returns limited events in reverse chronological order [5.59ms]
+(pass) EventQueryRepository > getByType filters events by type [6.41ms]
+(pass) EventQueryRepository > getByActor filters events by actor [5.25ms]
+(pass) EventQueryRepository > getSince returns events after given timestamp [57.78ms]
+(pass) EventQueryRepository > getByType with limit option [5.85ms]
+(pass) EventQueryRepository > getByActor with since option [58.30ms]
+(pass) EventQueryRepository > event rows have expected shape (ivy-blackboard schema) [5.67ms]
+
+test-kernel/scheduler.test.ts:
+(pass) dispatch > returns empty result when no work items exist [12.11ms]
+[persona] Selected "Architect" for work item "Task high-pri"
+(pass) dispatch > dispatches highest-priority available item [13.26ms]
+[persona] Selected "Architect" for work item "Task task-1"
+[persona] Selected "Architect" for work item "Task task-2"
+(pass) dispatch > dispatches multiple items up to maxItems [7.82ms]
+[persona] Selected "Architect" for work item "Task task-b"
+(pass) dispatch > respects project filter [6.98ms]
+[persona] Selected "Architect" for work item "Task task-p1"
+(pass) dispatch > respects priority filter [8.35ms]
+[persona] Selected "Architect" for work item "No project"
+(pass) dispatch > dispatches items with no project using HOME as workdir [5.71ms]
+[persona] Selected "Architect" for work item "Task task-remote"
+(pass) dispatch > dispatches items whose project has no local_path using HOME [5.61ms]
+(pass) dispatch > dry run does not claim or launch [5.67ms]
+[persona] Selected "Architect" for work item "Task task-fail"
+(pass) dispatch > releases work on non-zero exit code [7.29ms]
+[persona] Selected "Architect" for work item "Task task-crash"
+(pass) dispatch > releases work on launcher exception [5.94ms]
+(pass) dispatch > respects concurrency limit from pre-existing agents [3.92ms]
+[persona] Selected "Architect" for work item "Task task-1"
+[persona] Selected "Architect" for work item "Task task-2"
+(pass) dispatch > sequential processing allows multiple items with maxConcurrent=1 [9.59ms]
+[persona] Selected "QATester" for work item "Add retry logic"
+(pass) dispatch > prompt includes work item title and description [6.14ms]
+[persona] Selected "Architect" for work item "Task task-1"
+(pass) dispatch > timeout is passed to launcher in milliseconds [5.48ms]
+[persona] Selected "Architect" for work item "Task task-1"
+(pass) dispatch > records events for dispatch lifecycle [5.39ms]
+[persona] Selected "Architect" for work item "Task task-a"
+[persona] Selected "Architect" for work item "Task task-b"
+(pass) dispatch > handles multiple projects in one run [8.30ms]
+[persona] Selected "Architect" for work item "Task task-1"
+(pass) dispatch > completed work items are not re-dispatched [6.00ms]
+
+test-kernel/schedule.test.ts:
+(pass) generatePlist > produces valid XML with correct label [0.13ms]
+(pass) generatePlist > source mode: contains bun path and script path [0.02ms]
+(pass) generatePlist > compiled mode: contains only binary path, no script path [0.02ms]
+(pass) generatePlist > contains check subcommand in ProgramArguments [0.02ms]
+(pass) generatePlist > contains correct StartInterval [0.01ms]
+(pass) generatePlist > interval conversion: 30 min = 1800 seconds [0.04ms]
+(pass) generatePlist > interval conversion: 15 min = 900 seconds [0.05ms]
+(pass) generatePlist > contains stdout log path
+(pass) generatePlist > contains stderr log path
+(pass) generatePlist > has RunAtLoad set to true
+(pass) generatePlist > includes PATH environment variable with ~/bin
+(pass) generatePlist > includes HOME environment variable [0.02ms]
+(pass) generatePlist > includes AbandonProcessGroup
+(pass) generatePlist > no tilde in output [0.03ms]
+(pass) generatePlist > includes --db flag when dbPath provided
+(pass) generatePlist > excludes --db flag when dbPath not provided
+(pass) generatePlist > escapes XML special characters in paths [0.08ms]
+(pass) generatePlist > --db comes before check in args [0.02ms]
+(pass) resolvePlistPath > returns path under ~/Library/LaunchAgents
+(pass) resolvePlistPath > path is absolute
+(pass) parseIntervalFromPlist > extracts interval in minutes from plist XML
+(pass) parseIntervalFromPlist > extracts 30 minute interval
+(pass) parseIntervalFromPlist > returns null for invalid XML
+(pass) DEFAULT_INTERVAL_MINUTES > is 60 minutes
+
+test-kernel/specflow-cleanup.test.ts:
+(pass) specflow-cleanup evaluator > no worktrees returns ok [12.17ms]
+(pass) specflow-cleanup evaluator > stale worktree is removed [6.45ms]
+(pass) specflow-cleanup evaluator > active worktree with recent work items is preserved [5.94ms]
+(pass) specflow-cleanup evaluator > cleanup failure returns alert [6.20ms]
+(pass) specflow-cleanup evaluator > blackboard not configured returns error [6.70ms]
+(pass) specflow-cleanup evaluator > no work items for feature makes worktree stale [6.76ms]
+(pass) specflow-cleanup evaluator > configurable staleness_days [6.70ms]
+
+test-kernel/calendar-evaluator.test.ts:
+(pass) parseCalendarConfig > returns defaults when no config [0.12ms]
+(pass) parseCalendarConfig > reads custom config values [0.03ms]
+(pass) detectConflicts > no conflicts with non-overlapping events [0.09ms]
+(pass) detectConflicts > detects overlapping events [0.03ms]
+(pass) detectConflicts > detects multiple conflicts
+(pass) detectConflicts > empty events returns no conflicts [0.03ms]
+(pass) detectConflicts > single event returns no conflicts
+(pass) evaluateCalendar > returns ok when no events [0.08ms]
+(pass) evaluateCalendar > returns ok when events but no conflicts [0.07ms]
+(pass) evaluateCalendar > returns alert when conflicts detected
+(pass) evaluateCalendar > respects conflict threshold
+(pass) evaluateCalendar > filters by calendar name [0.26ms]
+(pass) evaluateCalendar > handles fetcher error gracefully
+(pass) evaluateCalendar > filters events outside lookahead window
+
+test-kernel/skills.test.ts:
+(pass) Skills Module > listSkills > discovers skills and parses yaml frontmatter [21.16ms]
+(pass) Skills Module > buildSkillContext > combines contents correctly [0.04ms]
+(pass) Skills Module > buildSkillContext > throws error for missing skill [0.12ms]
+(pass) Skills Module > buildSkillContext > handles empty array [0.04ms]
+
+test-kernel/credential.test.ts:
+(pass) credential audit logging > logCredentialAccess records event with correct metadata [4.14ms]
+(pass) credential audit logging > logCredentialDenied records denial with reason [3.67ms]
+(pass) credential audit logging > multiple credential events are recorded independently [3.88ms]
+(pass) credential audit logging > credential events are searchable via FTS [3.91ms]
+(pass) credential scope config > returns default config when file does not exist [0.05ms]
+(pass) credential scope config > loads config from file [0.52ms]
+(pass) credential scope config > returns default config for invalid JSON [0.28ms]
+(pass) isCredentialAllowed > allows when skill has explicit rule for credential type
+(pass) isCredentialAllowed > denies when skill rule does not include credential type
+(pass) isCredentialAllowed > wildcard rule allows any credential type [0.19ms]
+(pass) isCredentialAllowed > falls back to default deny when no rule matches
+(pass) isCredentialAllowed > falls back to default allow when no rule matches [0.02ms]
+(pass) isCredentialAllowed > skill with explicit rule is checked even under allow-all default
+
+test-kernel/observe.test.ts:
+(pass) observe summary > returns zeros for empty blackboard [6.30ms]
+(pass) observe summary > counts events [4.51ms]
+(pass) observe summary > counts events by type [3.95ms]
+(pass) observe summary > tracks active agents [4.30ms]
+(pass) observe summary > shows last heartbeat time [3.99ms]
+(pass) observe summary > extracts recent checks from event metadata [3.79ms]
+(pass) observe summary > deduplicates checks by name [3.85ms]
+(pass) observe summary > formatSummaryText produces readable output [4.77ms]
+
+test-kernel/heartbeat-parser.test.ts:
+(pass) parseContent > parses valid 3-item checklist [0.43ms]
+(pass) parseContent > first item has correct fields [0.16ms]
+(pass) parseContent > email item captures senders in config [0.09ms]
+(pass) parseContent > custom item captures command in config [0.05ms]
+Warning: Skipping "Invalid Item": Invalid option: expected one of "calendar"|"email"|"github_issues"|"github_issue_watcher"|"tana_todos"|"agent_dispatch"|"specflow_cleanup"|"custom"
+(pass) parseContent > skips invalid items, keeps valid ones [0.30ms]
+Warning: Skipping "Invalid Item": Invalid option: expected one of "calendar"|"email"|"github_issues"|"github_issue_watcher"|"tana_todos"|"agent_dispatch"|"specflow_cleanup"|"custom"
+(pass) parseContent > disabled items are included with enabled=false
+(pass) parseContent > applies default values for missing optional fields
+(pass) parseContent > returns empty array for content with no yaml blocks [0.02ms]
+(pass) parseContent > returns empty array for empty string [0.02ms]
+(pass) parseHeartbeatChecklist (file-based) > returns empty array for missing file
+(pass) parseHeartbeatChecklist (file-based) > parses file from custom path [0.51ms]
+(pass) parseHeartbeatChecklist (file-based) > parses empty file gracefully [0.33ms]
+
+test-kernel/kai-manual.test.ts:
+(pass) kai-manual pre-session > loadAlgorithmTemplate returns valid markdown with placeholders replaced [7.82ms]
+(pass) kai-manual pre-session > loadAlgorithmTemplate injects steering rules from past facts [4.00ms]
+(pass) kai-manual pre-session > loadAlgorithmTemplate injects project context from past sessions [4.29ms]
+(pass) kai-manual post-session (runPostSession) > extracts facts from a valid transcript and writes events to DB [5.52ms]
+[kai-manual] Transcript not found: /nonexistent/path.jsonl
+(pass) kai-manual post-session (runPostSession) > returns 0 for missing transcript file [5.94ms]
+[kai-manual] Empty transcript, skipping post-session extraction.
+(pass) kai-manual post-session (runPostSession) > returns 0 for empty transcript [5.79ms]
+[kai-manual] No parseable messages in transcript, skipping.
+(pass) kai-manual post-session (runPostSession) > returns 0 for transcript with no parseable messages [5.84ms]
+(pass) kai-manual post-session (runPostSession) > facts from post-session are available in next pre-session [5.17ms]
+
+test-kernel/serve.test.ts:
+(pass) web dashboard server > GET / returns HTML dashboard [11.46ms]
+(pass) web dashboard server > GET /api/events returns JSON array [6.03ms]
+(pass) web dashboard server > GET /api/events respects limit [7.84ms]
+(pass) web dashboard server > GET /api/heartbeats returns JSON array [6.78ms]
+(pass) web dashboard server > GET /api/summary returns summary object [5.86ms]
+(pass) web dashboard server > GET /api/search returns results for matching query [7.07ms]
+(pass) web dashboard server > GET /api/search returns empty for no query [9.01ms]
+(pass) web dashboard server > GET /unknown returns 404 [9.93ms]
+(pass) web dashboard server > CORS header restricts origin to localhost with server port [5.74ms]
+(pass) dashboard HTML > generates valid HTML with required elements
+
+test-kernel/specflow-runner.test.ts:
+(pass) specflow-runner > specify phase > calls specflow specify --batch and chains plan on success [7.53ms]
+(pass) specflow-runner > plan phase > reuses worktree from metadata and chains tasks [6.97ms]
+(pass) specflow-runner > tasks phase > chains implement phase (no quality gate) [6.97ms]
+(pass) specflow-runner > quality gate > gate pass (score >= 80%) chains next phase [5.74ms]
+(pass) specflow-runner > quality gate > gate fail (first attempt) creates retry with feedback [7.64ms]
+(pass) specflow-runner > quality gate > gate fail (max retries exceeded) does not create retry [5.38ms]
+(pass) specflow-runner > work item chaining > chained item inherits feature_id, worktree_path, priority [5.53ms]
+(pass) specflow-runner > specflow CLI failure > non-zero exit code does not chain next phase [5.14ms]
+(pass) specflow-runner > specflow CLI failure > timeout returns without chaining [5.15ms]
+(pass) specflow-runner > complete phase > runs specflow complete and attempts worktree cleanup [7.87ms]
+(pass) specflow-runner > complete phase > generates missing artifacts and retries on complete failure [7.06ms]
+(pass) specflow-runner > complete phase > returns false when artifact generation fails [5.71ms]
+(pass) specflow-runner > complete phase > returns false when retry fails after artifact generation [6.05ms]
+(pass) specflow-runner > complete phase > returns false when complete fails for non-artifact reason [5.53ms]
+(pass) specflow-runner > detectMissingArtifacts > detects docs.md missing from stderr [4.46ms]
+(pass) specflow-runner > detectMissingArtifacts > detects verify.md not found from stdout [6.50ms]
+(pass) specflow-runner > detectMissingArtifacts > detects both missing [4.92ms]
+(pass) specflow-runner > detectMissingArtifacts > detects generic missing artifacts message [4.29ms]
+(pass) specflow-runner > detectMissingArtifacts > returns empty for unrelated errors [4.60ms]
+
+test-kernel/email-evaluator.test.ts:
+(pass) parseEmailConfig > returns null when IMAP not configured
+(pass) parseEmailConfig > uses env vars for IMAP config
+(pass) parseEmailConfig > item config overrides env vars for host/user
+(pass) parseEmailConfig > uses defaults for optional fields
+(pass) parseEmailConfig > parses from_filter as comma-separated list [0.27ms]
+(pass) evaluateEmail > returns ok with skip message when IMAP not configured
+(pass) evaluateEmail > returns alert when unread exceeds threshold
+(pass) evaluateEmail > returns ok when unread within threshold [0.23ms]
+(pass) evaluateEmail > returns ok when unread exactly at threshold
+(pass) evaluateEmail > returns error when IMAP counter throws [0.16ms]
+(pass) evaluateEmail > zero unread returns ok [0.03ms]
+
+test-kernel/tana-todos.test.ts:
+(pass) parseTanaTodosConfig > returns defaults for minimal config
+(pass) parseTanaTodosConfig > respects custom limit and workspace_id
+(pass) parseTanaTodosConfig > parses project_field_id
+(pass) parseTanaTodosConfig > returns empty tagId for missing tag_id
+(pass) evaluateTanaTodos > returns error when blackboard accessor not set [7.68ms]
+(pass) evaluateTanaTodos > returns error when tag_id is missing [5.71ms]
+(pass) evaluateTanaTodos > returns ok when no todos found [5.61ms]
+(pass) evaluateTanaTodos > returns alert and creates work items for new todos [4.11ms]
+(pass) evaluateTanaTodos > skips todos already tracked as work items (dedup by source_ref) [3.57ms]
+(pass) evaluateTanaTodos > second evaluator run skips already-created items (idempotent) [4.20ms]
+(pass) evaluateTanaTodos > work item has source tana and sourceRef is node ID [4.02ms]
+(pass) evaluateTanaTodos > work item title from node name, description includes child content [4.68ms]
+(pass) evaluateTanaTodos > minimal context: node with no children gets minimal_context in metadata [3.87ms]
+(pass) evaluateTanaTodos > content filter: allowed content included in description [3.85ms]
+(pass) evaluateTanaTodos > content filter: blocked content excluded, description has warning [5.61ms]
+(pass) evaluateTanaTodos > encoding-only block includes body with warning [3.58ms]
+(pass) evaluateTanaTodos > content filter error fails open [3.51ms]
+(pass) evaluateTanaTodos > MCP error returns status error (graceful failure) [4.64ms]
+(pass) evaluateTanaTodos > MCP timeout: accessor throws, evaluator returns error [4.04ms]
+(pass) evaluateTanaTodos > work item priority is P2 [3.72ms]
+(pass) evaluateTanaTodos > metadata includes content_filtered flag when clean [3.52ms]
+
+test-kernel/post-session.test.ts:
+(pass) parseTranscript > parses valid JSONL lines [1.00ms]
+(pass) parseTranscript > skips malformed lines [0.32ms]
+(pass) parseTranscript > handles empty file [0.28ms]
+(pass) extractSessionSummary > extracts session ID from filename
+(pass) extractSessionSummary > extracts project path from directory
+(pass) extractSessionSummary > calculates duration from timestamps
+(pass) extractSessionSummary > extracts tools from tool_use messages
+(pass) extractSessionSummary > extracts files from tool inputs
+(pass) extractSessionSummary > extracts assistant text messages [0.18ms]
+(pass) extractFacts > extracts "decided to" facts [0.04ms]
+(pass) extractFacts > extracts "root cause" facts
+(pass) extractFacts > extracts pattern indicators [0.06ms]
+(pass) extractFacts > deduplicates identical facts [0.02ms]
+(pass) extractFacts > returns empty for no matching patterns
+(pass) extractFacts > extracts key insight facts [0.04ms]
+(pass) post-session hook integration > full pipeline: parse → extract → record events [5.05ms]
+
+test-kernel/dispatch-tana.test.ts:
+(pass) parseTanaMeta > returns isTana: false for null metadata
+(pass) parseTanaMeta > returns isTana: false for non-Tana metadata (GitHub)
+(pass) parseTanaMeta > returns isTana: true for valid Tana metadata
+(pass) parseTanaMeta > returns isTana: false for malformed JSON
+(pass) parseTanaMeta > returns isTana: false for empty object
+(pass) parseTanaMeta > returns isTana: true with only tana_node_id (minimal metadata)
+(pass) parseTanaMeta > returns isTana: false for empty string
+
+test-kernel/worktree.test.ts:
+(pass) isCleanBranch > returns true on clean repo [55.92ms]
+(pass) isCleanBranch > returns false with uncommitted changes [54.62ms]
+(pass) isCleanBranch > returns false with staged but uncommitted changes [60.03ms]
+(pass) getCurrentBranch > returns main for default branch [50.19ms]
+(pass) createWorktree > creates a worktree directory with correct branch [127.56ms]
+(pass) createWorktree > handles existing branch by recreating [189.16ms]
+(pass) removeWorktree > removes an existing worktree [114.94ms]
+(pass) removeWorktree > does not throw for non-existent worktree [54.08ms]
+(pass) commitAll > commits changes and returns sha [88.61ms]
+(pass) commitAll > returns null when no changes to commit [58.40ms]
+(pass) buildCommentPrompt > includes issue number and PR URL [0.12ms]
+(pass) buildCommentPrompt > handles missing body
+(pass) resolveWorktreePath > uses projectId when provided [0.06ms]
+(pass) resolveWorktreePath > derives dir name from project path when no projectId [0.03ms]
+(pass) rebaseOnMain > returns false when rebase fails (no remote) [104.38ms]
+(pass) getConflictedFiles > returns empty array when no conflicts [52.54ms]
+
+test-kernel/blackboard.test.ts:
+(pass) Blackboard initialization (via ivy-blackboard) > creates all required tables [9.81ms]
+(pass) Blackboard initialization (via ivy-blackboard) > enables WAL journal mode [3.83ms]
+(pass) Blackboard initialization (via ivy-blackboard) > enables foreign keys [7.35ms]
+(pass) Blackboard initialization (via ivy-blackboard) > records schema version [4.09ms]
+(pass) Blackboard initialization (via ivy-blackboard) > is idempotent (opening same path twice works) [4.05ms]
+(pass) Blackboard initialization (via ivy-blackboard) > custom path works [10.01ms]
+(pass) Agent lifecycle (delegated to ivy-blackboard) > registerAgent creates agent with UUID session [4.41ms]
+(pass) Agent lifecycle (delegated to ivy-blackboard) > registerAgent works without optional fields [3.76ms]
+(pass) Agent lifecycle (delegated to ivy-blackboard) > sendHeartbeat updates last_seen_at [4.00ms]
+(pass) Agent lifecycle (delegated to ivy-blackboard) > sendHeartbeat without progress [3.66ms]
+(pass) Agent lifecycle (delegated to ivy-blackboard) > deregisterAgent sets status to completed [3.96ms]
+(pass) Agent lifecycle (delegated to ivy-blackboard) > sendHeartbeat throws for unknown session [6.92ms]
+(pass) Agent lifecycle (delegated to ivy-blackboard) > deregisterAgent throws for unknown session [6.20ms]
+(pass) appendEvent > appends event with heartbeat_received type [4.26ms]
+(pass) appendEvent > appends event with metadata [4.56ms]
+(pass) appendEvent > appends event without optional fields [4.21ms]
+
+test-kernel/persona-loader.test.ts:
+(pass) loadPersona > loads a valid persona file and parses frontmatter [1.47ms]
+(pass) loadPersona > returns null for missing file [0.80ms]
+(pass) loadPersona > strips PAI boilerplate from identity block [0.79ms]
+(pass) loadPersona > marks sub-agents as non-dispatchable [0.93ms]
+(pass) loadPersona > extracts capability keywords from description [0.68ms]
+(pass) loadAllDispatchable > returns only dispatchable personas [1.34ms]
+(pass) scoreBid > scores Engineer highest for code/implementation tasks [1.04ms]
+(pass) scoreBid > scores Designer highest for design/UX tasks [0.99ms]
+(pass) scoreBid > scores QATester highest for testing tasks [0.94ms]
+(pass) selectPersona > explicit metadata override bypasses bidding [0.84ms]
+(pass) selectPersona > returns null for override with missing persona file [0.77ms]
+(pass) selectPersona > selects best-fit persona via bidding when no override [1.09ms]
+(pass) selectPersona > falls back to Architect when no match [0.98ms]
+(pass) selectPersona > handles invalid JSON metadata gracefully [0.94ms]
+(pass) selectPersona > handles metadata without agent_persona field [1.01ms]
+
+test-kernel/specflow-queue.test.ts:
+(pass) specflow-queue > work item creation > valid project + feature creates work item with correct metadata [8.65ms]
+(pass) specflow-queue > validation > project without specflow_enabled is detected [4.40ms]
+(pass) specflow-queue > validation > nonexistent project is detected [6.73ms]
+(pass) specflow-queue > validation > duplicate work item detection [3.89ms]
+(pass) specflow-queue > validation > completed work items do not count as duplicates [6.12ms]
+
+test-kernel/alert.test.ts:
+(pass) isWithinActiveHours > returns true during default active hours (10:00)
+(pass) isWithinActiveHours > returns true at start boundary (08:00)
+(pass) isWithinActiveHours > returns false at end boundary (22:00)
+(pass) isWithinActiveHours > returns false before active hours (06:00)
+(pass) isWithinActiveHours > returns false after active hours (23:00)
+(pass) isWithinActiveHours > respects custom config
+(pass) isWithinActiveHours > midnight is outside default hours
+(pass) notifyEmail > stub returns false (not configured) [0.26ms]
+(pass) dispatchAlert > routes to terminal channel [108.24ms]
+(pass) dispatchAlert > email stub results in failed delivery [0.17ms]
+(pass) dispatchAlert > multiple channels fire independently [107.12ms]
+(pass) dispatchAlert > suppresses all channels outside active hours [0.16ms]
+(pass) dispatchAlert > empty channels array returns empty result
+(pass) alert dispatch integration > ok results do not trigger dispatch events [7.75ms]
+(pass) alert dispatch integration > alert results trigger dispatch events [113.66ms]
+(pass) alert dispatch integration > error results also trigger dispatch events [117.35ms]
+(pass) alert dispatch integration > dry-run does not dispatch alerts [5.89ms]
+
+test-kernel/github-issue-watcher.test.ts:
+(pass) evaluateGithubIssueWatcher > returns error when blackboard not configured [12.66ms]
+(pass) evaluateGithubIssueWatcher > returns ok when no items being watched [8.89ms]
+(pass) evaluateGithubIssueWatcher > skips items without github_issue waiting_type [6.03ms]
+(pass) evaluateGithubIssueWatcher > detects issue closure and creates continuation work item [5.85ms]
+(pass) evaluateGithubIssueWatcher > detects new comments and creates response work items [6.08ms]
+(pass) evaluateGithubIssueWatcher > returns ok when no new activity on watched issues [5.84ms]
+(pass) evaluateGithubIssueWatcher > handles fetch failure gracefully [5.64ms]
+(pass) evaluateGithubIssueWatcher > handles multiple watched issues in parallel [5.26ms]
+(pass) evaluateGithubIssueWatcher > continuation metadata includes resolution details [5.53ms]
+(pass) evaluateGithubIssueWatcher > handles errors from evaluator gracefully [5.65ms]
+(pass) evaluateGithubIssueWatcher > handles items with invalid metadata gracefully [6.33ms]
+(pass) waiting_for_response status in blackboard > can create work items with waiting_for_response status via setWaitingForResponse [4.45ms]
+(pass) waiting_for_response status in blackboard > waiting_for_response items are NOT returned by default listWorkItems [4.29ms]
+(pass) waiting_for_response status in blackboard > completeWaitingItem completes a waiting_for_response item [5.70ms]
+(pass) waiting_for_response status in blackboard > completeWaitingItem is a no-op for non-waiting items [4.18ms]
+(pass) waiting_for_response status in blackboard > unblockWorkItem works with waiting_for_response items [4.19ms]
+
+test-kernel/fts.test.ts:
+(pass) FTS5 full-text search > events_fts table exists after init [5.54ms]
+(pass) FTS5 full-text search > insert trigger exists [4.10ms]
+(pass) FTS5 full-text search > delete trigger exists [3.83ms]
+(pass) FTS5 full-text search > search returns empty for no matches [4.24ms]
+(pass) FTS5 full-text search > search finds events by summary text [4.74ms]
+(pass) FTS5 full-text search > search finds events by metadata content [4.38ms]
+(pass) FTS5 full-text search > search respects limit option [7.72ms]
+(pass) FTS5 full-text search > search results include rank score [4.63ms]
+(pass) FTS5 full-text search > search is case-insensitive [3.87ms]
+(pass) FTS5 full-text search > multiple Blackboard inits do not duplicate FTS table [7.65ms]
+(pass) FTS5 full-text search > search performance: <100ms for 1000 events [134.79ms]
+
+test-kernel/cli.test.ts:
+(pass) CLI: agent register > register returns session_id as UUID [7.69ms]
+(pass) CLI: agent register > register with all options [3.95ms]
+(pass) CLI: agent register > register with parent (delegate) [4.09ms]
+(pass) CLI: agent heartbeat > heartbeat with progress [7.18ms]
+(pass) CLI: agent heartbeat > heartbeat without progress [4.57ms]
+(pass) CLI: agent heartbeat > heartbeat for unknown session throws [6.26ms]
+(pass) CLI: agent deregister > deregister completes session [3.84ms]
+(pass) CLI: agent deregister > deregister for unknown session throws [5.64ms]
+(pass) CLI: agent deregister > deregistered agent shows as completed [4.26ms]
+(pass) CLI: agent list > list returns active agents [4.14ms]
+(pass) CLI: agent list > list excludes completed agents by default [4.31ms]
+(pass) CLI: agent list > list --all includes completed [4.11ms]
+(pass) CLI: agent list > list --status filter [4.13ms]
+(pass) CLI: agent list > empty list [5.73ms]
+(pass) CLI: observe events > observe events shows recent events [3.71ms]
+(pass) CLI: observe events > observe events with type filter [3.72ms]
+(pass) CLI: observe heartbeats > observe heartbeats shows recent [4.17ms]
+(pass) CLI: observe heartbeats > observe heartbeats with session filter [4.21ms]
+
+test-kernel/daily-log.test.ts:
+(pass) daily log export > returns empty log for date with no events [5.86ms]
+(pass) daily log export > categorizes check events correctly [3.88ms]
+(pass) daily log export > categorizes session events correctly [4.43ms]
+(pass) daily log export > categorizes fact events correctly [4.52ms]
+(pass) daily log export > categorizes credential events correctly [4.20ms]
+(pass) daily log export > generates markdown with all sections [4.09ms]
+(pass) daily log export > omits empty sections [4.06ms]
+(pass) daily log export > does not include events from other dates [3.80ms]
+(pass) daily log export > collectDailyEvents returns correct totals [4.28ms]
+
+test-kernel/merge-fix.test.ts:
+(pass) parseMergeFixMeta > returns null for null metadata [9.48ms]
+(pass) parseMergeFixMeta > returns null for non-merge-fix metadata [6.87ms]
+(pass) parseMergeFixMeta > returns null for invalid JSON [6.81ms]
+(pass) parseMergeFixMeta > returns null when merge_fix is not true [6.35ms]
+(pass) parseMergeFixMeta > returns null when required fields are missing [7.66ms]
+(pass) parseMergeFixMeta > parses valid merge-fix metadata [6.43ms]
+(pass) parseMergeFixMeta > handles missing optional fields [5.75ms]
+(pass) createMergeFixWorkItem > creates a P1 work item with correct ID and title [4.36ms]
+(pass) createMergeFixWorkItem > creates title without issue number when not provided [4.15ms]
+(pass) createMergeFixWorkItem > logs event linking merge-fix to original item [5.34ms]
+(pass) createMergeFixWorkItem > description includes PR URL and branch info [4.83ms]
+
+8 tests failed:
+(fail) CLI sweep > sweep --dry-run does not modify state [61.75ms]
+(fail) CLI learn > learn query --project --json returns JSON envelope [61.97ms]
+(fail) CLI observe > observe --filter works in JSON mode [122.27ms]
+(fail) CLI status > status human output includes database size [63.35ms]
+(fail) CLI export > export outputs valid JSON snapshot [60.74ms]
+(fail) CLI export > export --pretty outputs indented JSON [64.96ms]
+(fail) CLI export > export --output writes to file [64.60ms]
+(fail) CLI export > export --output --json confirms with JSON envelope [63.58ms]
+
+ 819 pass
+ 8 fail
+ 1961 expect() calls
+Ran 827 tests across 48 files. [11.67s]

@@ -1,0 +1,348 @@
+export const CURRENT_SCHEMA_VERSION = 7;
+
+export const PRAGMA_SQL = [
+    "PRAGMA journal_mode = WAL;",
+    "PRAGMA foreign_keys = ON;",
+    "PRAGMA busy_timeout = 5000;",
+];
+
+export const CREATE_TABLES_SQL = `
+CREATE TABLE IF NOT EXISTS agents (
+    session_id    TEXT PRIMARY KEY,
+    agent_name    TEXT NOT NULL,
+    pid           INTEGER,
+    parent_id     TEXT,
+    project       TEXT,
+    current_work  TEXT,
+    status        TEXT NOT NULL DEFAULT 'active'
+                  CHECK (status IN ('active', 'idle', 'completed', 'stale')),
+    started_at    TEXT NOT NULL,
+    last_seen_at  TEXT NOT NULL,
+    metadata      TEXT,
+
+    FOREIGN KEY (parent_id) REFERENCES agents(session_id)
+);
+
+CREATE TABLE IF NOT EXISTS projects (
+    project_id    TEXT PRIMARY KEY,
+    display_name  TEXT NOT NULL,
+    local_path    TEXT,
+    remote_repo   TEXT,
+    registered_at TEXT NOT NULL,
+    metadata      TEXT
+);
+
+CREATE TABLE IF NOT EXISTS work_items (
+    item_id       TEXT PRIMARY KEY,
+    project_id    TEXT,
+    title         TEXT NOT NULL,
+    description   TEXT,
+    source        TEXT NOT NULL,
+    source_ref    TEXT,
+    status        TEXT NOT NULL DEFAULT 'available'
+                  CHECK (status IN ('available', 'claimed', 'completed', 'blocked', 'waiting_for_response', 'pending_approval')),
+    priority      TEXT DEFAULT 'P2'
+                  CHECK (priority IN ('P1', 'P2', 'P3')),
+    claimed_by    TEXT,
+    claimed_at    TEXT,
+    completed_at  TEXT,
+    blocked_by    TEXT,
+    created_at    TEXT NOT NULL,
+    metadata      TEXT,
+    handover_context TEXT,
+    approval_request TEXT,
+
+    FOREIGN KEY (project_id) REFERENCES projects(project_id),
+    FOREIGN KEY (claimed_by) REFERENCES agents(session_id)
+);
+
+CREATE TABLE IF NOT EXISTS snapshots (
+    snapshot_id   TEXT PRIMARY KEY,
+    created_at    TEXT NOT NULL,
+    trigger       TEXT NOT NULL,
+    item_count    INTEGER DEFAULT 0,
+    agent_count   INTEGER DEFAULT 0,
+    data          TEXT
+);
+
+CREATE TABLE IF NOT EXISTS heartbeats (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id    TEXT NOT NULL,
+    timestamp     TEXT NOT NULL,
+    progress      TEXT,
+    work_item_id  TEXT,
+    metadata      TEXT,
+
+    FOREIGN KEY (session_id) REFERENCES agents(session_id),
+    FOREIGN KEY (work_item_id) REFERENCES work_items(item_id)
+);
+
+CREATE TABLE IF NOT EXISTS events (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp     TEXT NOT NULL,
+    event_type    TEXT NOT NULL,
+    actor_id      TEXT,
+    target_id     TEXT,
+    target_type   TEXT
+                  CHECK (target_type IN ('agent', 'work_item', 'project')),
+    summary       TEXT NOT NULL,
+    metadata      TEXT
+);
+
+CREATE TABLE IF NOT EXISTS steering_rules (
+    rule_id       TEXT PRIMARY KEY,
+    project_id    TEXT,
+    rule_text     TEXT NOT NULL,
+    source_event  INTEGER,
+    confidence    REAL DEFAULT 0.5,
+    hit_count     INTEGER DEFAULT 0,
+    status        TEXT DEFAULT 'active'
+                  CHECK (status IN ('active', 'retired', 'candidate')),
+    created_at    TEXT NOT NULL,
+    updated_at    TEXT NOT NULL,
+    metadata      TEXT,
+
+    FOREIGN KEY (project_id) REFERENCES projects(project_id),
+    FOREIGN KEY (source_event) REFERENCES events(id)
+);
+
+CREATE TABLE IF NOT EXISTS schema_version (
+    version       INTEGER PRIMARY KEY,
+    applied_at    TEXT NOT NULL,
+    description   TEXT
+);
+`;
+
+export const CREATE_INDEXES_SQL = `
+CREATE INDEX IF NOT EXISTS idx_agents_status ON agents(status);
+CREATE INDEX IF NOT EXISTS idx_agents_project ON agents(project);
+CREATE INDEX IF NOT EXISTS idx_agents_parent ON agents(parent_id);
+CREATE INDEX IF NOT EXISTS idx_agents_last_seen ON agents(last_seen_at);
+
+CREATE INDEX IF NOT EXISTS idx_work_items_status ON work_items(status);
+CREATE INDEX IF NOT EXISTS idx_work_items_project ON work_items(project_id);
+CREATE INDEX IF NOT EXISTS idx_work_items_claimed_by ON work_items(claimed_by);
+CREATE INDEX IF NOT EXISTS idx_work_items_priority ON work_items(priority, status);
+
+CREATE INDEX IF NOT EXISTS idx_heartbeats_session ON heartbeats(session_id, timestamp);
+CREATE INDEX IF NOT EXISTS idx_heartbeats_timestamp ON heartbeats(timestamp);
+
+CREATE INDEX IF NOT EXISTS idx_events_timestamp ON events(timestamp);
+CREATE INDEX IF NOT EXISTS idx_events_type ON events(event_type);
+CREATE INDEX IF NOT EXISTS idx_events_actor ON events(actor_id);
+
+CREATE INDEX IF NOT EXISTS idx_steering_rules_project ON steering_rules(project_id);
+CREATE INDEX IF NOT EXISTS idx_steering_rules_status ON steering_rules(status);
+`;
+
+export const SEED_VERSION_SQL = `
+INSERT OR IGNORE INTO schema_version (version, applied_at, description)
+VALUES (1, datetime('now'), 'Initial local blackboard schema');
+INSERT OR IGNORE INTO schema_version (version, applied_at, description)
+VALUES (2, datetime('now'), 'Remove event_type CHECK constraint');
+INSERT OR IGNORE INTO schema_version (version, applied_at, description)
+VALUES (3, datetime('now'), 'Add metadata column to heartbeats');
+INSERT OR IGNORE INTO schema_version (version, applied_at, description)
+VALUES (4, datetime('now'), 'Remove source CHECK constraint (extensible sources)');
+INSERT OR IGNORE INTO schema_version (version, applied_at, description)
+VALUES (5, datetime('now'), 'Add waiting_for_response status to work_items');
+INSERT OR IGNORE INTO schema_version (version, applied_at, description)
+VALUES (6, datetime('now'), 'Add steering_rules table for learning loop');
+INSERT OR IGNORE INTO schema_version (version, applied_at, description)
+VALUES (7, datetime('now'), 'Add pending_approval status, handover_context, snapshots');
+`;
+
+/**
+ * Migration SQL for v1 → v2: Remove event_type CHECK constraint.
+ * SQLite doesn't support ALTER CHECK constraints directly,
+ * so we recreate the events table without the constraint.
+ */
+export const MIGRATE_V2_SQL = `
+CREATE TABLE events_v2 (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp     TEXT NOT NULL,
+    event_type    TEXT NOT NULL,
+    actor_id      TEXT,
+    target_id     TEXT,
+    target_type   TEXT
+                  CHECK (target_type IN ('agent', 'work_item', 'project')),
+    summary       TEXT NOT NULL,
+    metadata      TEXT
+);
+
+INSERT INTO events_v2 SELECT * FROM events;
+DROP TABLE events;
+ALTER TABLE events_v2 RENAME TO events;
+
+CREATE INDEX IF NOT EXISTS idx_events_timestamp ON events(timestamp);
+CREATE INDEX IF NOT EXISTS idx_events_type ON events(event_type);
+CREATE INDEX IF NOT EXISTS idx_events_actor ON events(actor_id);
+`;
+
+/**
+ * Migration SQL for v2 → v3: Add metadata column to heartbeats table.
+ * Simple ALTER TABLE ADD COLUMN — SQLite supports this natively.
+ */
+export const MIGRATE_V3_SQL = `
+ALTER TABLE heartbeats ADD COLUMN metadata TEXT;
+`;
+
+/**
+ * Migration SQL for v3 → v4: Remove source CHECK constraint on work_items.
+ * SQLite doesn't support ALTER CHECK constraints directly,
+ * so we recreate the work_items table without the source constraint.
+ */
+export const MIGRATE_V4_SQL = `
+CREATE TABLE work_items_v4 (
+    item_id       TEXT PRIMARY KEY,
+    project_id    TEXT,
+    title         TEXT NOT NULL,
+    description   TEXT,
+    source        TEXT NOT NULL,
+    source_ref    TEXT,
+    status        TEXT NOT NULL DEFAULT 'available'
+                  CHECK (status IN ('available', 'claimed', 'completed', 'blocked', 'waiting_for_response')),
+    priority      TEXT DEFAULT 'P2'
+                  CHECK (priority IN ('P1', 'P2', 'P3')),
+    claimed_by    TEXT,
+    claimed_at    TEXT,
+    completed_at  TEXT,
+    blocked_by    TEXT,
+    created_at    TEXT NOT NULL,
+    metadata      TEXT,
+
+    FOREIGN KEY (project_id) REFERENCES projects(project_id),
+    FOREIGN KEY (claimed_by) REFERENCES agents(session_id)
+);
+
+PRAGMA foreign_keys = OFF;
+INSERT INTO work_items_v4 SELECT * FROM work_items;
+DROP TABLE work_items;
+ALTER TABLE work_items_v4 RENAME TO work_items;
+
+CREATE INDEX IF NOT EXISTS idx_work_items_status ON work_items(status);
+CREATE INDEX IF NOT EXISTS idx_work_items_project ON work_items(project_id);
+CREATE INDEX IF NOT EXISTS idx_work_items_claimed_by ON work_items(claimed_by);
+CREATE INDEX IF NOT EXISTS idx_work_items_priority ON work_items(priority, status);
+PRAGMA foreign_keys = ON;
+`;
+
+/**
+ * Migration SQL for v4 → v5: Add waiting_for_response to work_items status CHECK.
+ * SQLite doesn't support ALTER CHECK constraints directly,
+ * so we recreate the work_items table with the extended constraint.
+ */
+export const MIGRATE_V5_SQL = `
+PRAGMA foreign_keys = OFF;
+CREATE TABLE work_items_v5 (
+    item_id       TEXT PRIMARY KEY,
+    project_id    TEXT,
+    title         TEXT NOT NULL,
+    description   TEXT,
+    source        TEXT NOT NULL,
+    source_ref    TEXT,
+    status        TEXT NOT NULL DEFAULT 'available'
+                  CHECK (status IN ('available', 'claimed', 'completed', 'blocked', 'waiting_for_response')),
+    priority      TEXT DEFAULT 'P2'
+                  CHECK (priority IN ('P1', 'P2', 'P3')),
+    claimed_by    TEXT,
+    claimed_at    TEXT,
+    completed_at  TEXT,
+    blocked_by    TEXT,
+    created_at    TEXT NOT NULL,
+    metadata      TEXT,
+
+    FOREIGN KEY (project_id) REFERENCES projects(project_id),
+    FOREIGN KEY (claimed_by) REFERENCES agents(session_id)
+);
+
+INSERT INTO work_items_v5 SELECT * FROM work_items;
+DROP TABLE work_items;
+ALTER TABLE work_items_v5 RENAME TO work_items;
+
+CREATE INDEX IF NOT EXISTS idx_work_items_status ON work_items(status);
+CREATE INDEX IF NOT EXISTS idx_work_items_project ON work_items(project_id);
+CREATE INDEX IF NOT EXISTS idx_work_items_claimed_by ON work_items(claimed_by);
+CREATE INDEX IF NOT EXISTS idx_work_items_priority ON work_items(priority, status);
+PRAGMA foreign_keys = ON;
+`;
+
+/**
+ * Migration SQL for v5 → v6: Add steering_rules table for the learning loop.
+ */
+export const MIGRATE_V6_SQL = `
+CREATE TABLE IF NOT EXISTS steering_rules (
+    rule_id       TEXT PRIMARY KEY,
+    project_id    TEXT,
+    rule_text     TEXT NOT NULL,
+    source_event  INTEGER,
+    confidence    REAL DEFAULT 0.5,
+    hit_count     INTEGER DEFAULT 0,
+    status        TEXT DEFAULT 'active'
+                  CHECK (status IN ('active', 'retired', 'candidate')),
+    created_at    TEXT NOT NULL,
+    updated_at    TEXT NOT NULL,
+    metadata      TEXT,
+
+    FOREIGN KEY (project_id) REFERENCES projects(project_id),
+    FOREIGN KEY (source_event) REFERENCES events(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_steering_rules_project ON steering_rules(project_id);
+CREATE INDEX IF NOT EXISTS idx_steering_rules_status ON steering_rules(status);
+`;
+
+/**
+ * Migration SQL for v6 → v7: Add pending_approval status, handover/approval columns,
+ * and snapshots table.
+ *
+ * - Recreates work_items with extended CHECK constraint + new columns
+ * - Creates snapshots table for pre-dispatch state capture
+ */
+export const MIGRATE_V7_SQL = `
+PRAGMA foreign_keys = OFF;
+CREATE TABLE work_items_v7 (
+    item_id       TEXT PRIMARY KEY,
+    project_id    TEXT,
+    title         TEXT NOT NULL,
+    description   TEXT,
+    source        TEXT NOT NULL,
+    source_ref    TEXT,
+    status        TEXT NOT NULL DEFAULT 'available'
+                  CHECK (status IN ('available', 'claimed', 'completed', 'blocked', 'waiting_for_response', 'pending_approval')),
+    priority      TEXT DEFAULT 'P2'
+                  CHECK (priority IN ('P1', 'P2', 'P3')),
+    claimed_by    TEXT,
+    claimed_at    TEXT,
+    completed_at  TEXT,
+    blocked_by    TEXT,
+    created_at    TEXT NOT NULL,
+    metadata      TEXT,
+    handover_context TEXT,
+    approval_request TEXT,
+
+    FOREIGN KEY (project_id) REFERENCES projects(project_id),
+    FOREIGN KEY (claimed_by) REFERENCES agents(session_id)
+);
+
+INSERT INTO work_items_v7 (item_id, project_id, title, description, source, source_ref, status, priority, claimed_by, claimed_at, completed_at, blocked_by, created_at, metadata)
+    SELECT item_id, project_id, title, description, source, source_ref, status, priority, claimed_by, claimed_at, completed_at, blocked_by, created_at, metadata FROM work_items;
+DROP TABLE work_items;
+ALTER TABLE work_items_v7 RENAME TO work_items;
+
+CREATE INDEX IF NOT EXISTS idx_work_items_status ON work_items(status);
+CREATE INDEX IF NOT EXISTS idx_work_items_project ON work_items(project_id);
+CREATE INDEX IF NOT EXISTS idx_work_items_claimed_by ON work_items(claimed_by);
+CREATE INDEX IF NOT EXISTS idx_work_items_priority ON work_items(priority, status);
+
+CREATE TABLE IF NOT EXISTS snapshots (
+    snapshot_id   TEXT PRIMARY KEY,
+    created_at    TEXT NOT NULL,
+    trigger       TEXT NOT NULL,
+    item_count    INTEGER DEFAULT 0,
+    agent_count   INTEGER DEFAULT 0,
+    data          TEXT
+);
+
+PRAGMA foreign_keys = ON;
+`;
