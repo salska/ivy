@@ -119,7 +119,7 @@ export function buildPromptPreamble(provider?: ToolProvider): string {
     if (adapter.provider === 'claude') return '';
 
     const CORE_TOOLS: Array<[string, string]> = [
-        ['Bash', 'Run shell commands'],
+        ['Bash', 'Run shell commands. For modifying commands, you MUST provide an explicit instruction/explanation of your intent before calling the tool.'],
         ['Read', 'Read/view a file'],
         ['Write', 'Create or overwrite a file'],
         ['Edit', 'Edit part of a file (single block)'],

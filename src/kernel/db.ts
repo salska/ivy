@@ -15,6 +15,7 @@ import {
   MIGRATE_V5_SQL,
   MIGRATE_V6_SQL,
   MIGRATE_V7_SQL,
+  MIGRATE_V8_SQL,
 } from "./schema";
 import type { DbOptions } from "./types";
 import { loadConfig } from "./config";
@@ -170,6 +171,11 @@ export function migrate(db: Database): void {
         version: 7,
         description: "Add pending_approval status, handover_context, snapshots",
         fn: (db) => { db.exec(MIGRATE_V7_SQL); },
+      },
+      {
+        version: 8,
+        description: "Add semantic_cache table for query results",
+        fn: (db) => { db.exec(MIGRATE_V8_SQL); },
       },
     ];
 

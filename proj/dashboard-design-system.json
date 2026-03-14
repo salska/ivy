@@ -1,0 +1,37 @@
+{
+  "theme": "San Francisco / Ivory Blackboard",
+  "colors": {
+    "background": "#F5F5F7",
+    "surface": "#FFFFFF",
+    "primary": "#0071E3",
+    "secondary": "#86868B",
+    "success": "#34C759",
+    "warning": "#FF9500",
+    "error": "#FF3B30",
+    "border": "#D2D2D7"
+  },
+  "typography": {
+    "font_family": "SF Pro Display, system-ui",
+    "base_size": "14px",
+    "headings": {
+      "weight": "600",
+      "tracking": "-0.011em"
+    },
+    "metrics": {
+      "weight": "400",
+      "tracking": "-0.022em"
+    }
+  },
+  "components": {
+    "chart": {
+      "line_width": 1.5,
+      "grid_color": "#E5E5E5",
+      "smooth": true
+    },
+    "latency_bar": {
+      "height": "8px",
+      "border_radius": "4px",
+      "background": "#E5E5E5"
+    }
+  }
+}

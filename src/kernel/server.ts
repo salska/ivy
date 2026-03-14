@@ -4,6 +4,7 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 import { homedir } from "node:os";
 import { getOverallStatus } from "./status";
+import { getHealthStatus } from "./health";
 import { listAgents } from "./agent";
 import { listWorkItems, getWorkItemStatus, deleteWorkItem, updateWorkItemMetadata, appendWorkItemEvent, flushActiveWorkItems, approveWorkItem, rejectWorkItem } from "./work";
 import { createSnapshot, listSnapshots, restoreSnapshot } from "./snapshot";
@@ -78,6 +79,10 @@ export function createServer(
         // API routes
         if (url.pathname === "/api/status") {
           return jsonResponse(getOverallStatus(db, dbPath), 200, cors);
+        }
+
+        if (url.pathname === "/api/health") {
+          return jsonResponse(getHealthStatus(db), 200, cors);
         }
 
         if (url.pathname === "/api/agents") {

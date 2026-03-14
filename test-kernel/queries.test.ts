@@ -166,4 +166,34 @@ describe('EventQueryRepository', () => {
     expect(event.summary).toBe('Shape check');
     expect(typeof event.metadata).toBe('string'); // JSON string from SQLite
   });
+
+  test('search uses semantic cache', () => {
+    ctx.bb.appendEvent({ summary: 'Find me in the log' });
+    
+    // First search - hits DB
+    const results1 = ctx.bb.eventQueries.search('Find me');
+    expect(results1.length).toBe(1);
+    expect(results1[0]!.event.summary).toBe('Find me in the log');
+    
+    const stats1 = ctx.bb.semanticCache.stats();
+    expect(stats1.totalEntries).toBe(1);
+    expect(stats1.totalHits).toBe(0);
+
+    // Second search - hits cache (exact match)
+    const results2 = ctx.bb.eventQueries.search('Find me');
+    expect(results2.length).toBe(1);
+    expect(results2[0]!.event.summary).toBe('Find me in the log');
+    
+    const stats2 = ctx.bb.semanticCache.stats();
+    expect(stats2.totalHits).toBe(1);
+
+    // Third search - hits cache (semantic match)
+    // "Find me!" is slightly different from "Find me"
+    const results3 = ctx.bb.eventQueries.search('Find me!');
+    expect(results3.length).toBe(1);
+    expect(results3[0]!.event.summary).toBe('Find me in the log');
+    
+    const stats3 = ctx.bb.semanticCache.stats();
+    expect(stats3.totalHits).toBe(2);
+  });
 });

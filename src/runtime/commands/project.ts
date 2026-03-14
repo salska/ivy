@@ -70,10 +70,11 @@ export function registerProjectCommands(
                 } else if (projects.length === 0) {
                     console.log('No projects registered.');
                 } else {
-                    const headers = ['ID', 'NAME', 'AGENTS', 'AVAILABLE', 'CLAIMED', 'COMPLETED', 'REGISTERED'];
+                    const headers = ['ID', 'NAME', 'PATH', 'AGENTS', 'AVAILABLE', 'CLAIMED', 'COMPLETED', 'REGISTERED'];
                     const rows = projects.map((p) => [
                         p.project_id,
                         p.display_name,
+                        p.local_path ?? '-',
                         String(p.active_agents),
                         String(p.work_available),
                         String(p.work_claimed),

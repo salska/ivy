@@ -27,12 +27,13 @@ describe("types", () => {
   });
 
   describe("WorkItemStatus", () => {
-    it("has exactly 6 values", () => {
+    it("has exactly 7 values", () => {
       expect(WORK_ITEM_STATUSES).toEqual([
         "available",
         "claimed",
         "completed",
         "blocked",
+        "failed",
         "waiting_for_response",
         "pending_approval",
       ]);

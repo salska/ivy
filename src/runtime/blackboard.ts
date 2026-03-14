@@ -20,6 +20,7 @@ import {
   claimWorkItem,
   completeWorkItem,
   releaseWorkItem,
+  failWorkItem,
   blockWorkItem,
   unblockWorkItem,
   setWaitingForResponse,
@@ -34,6 +35,8 @@ import {
   type ClaimWorkItemResult,
   type CompleteWorkItemResult,
   type ReleaseWorkItemResult,
+  type FailWorkItemResult,
+  type WorkItemReleaseResult,
   type BlockWorkItemResult,
   type UnblockWorkItemResult,
   type SetWaitingResult,
@@ -55,6 +58,7 @@ import type { BlackboardProject, BlackboardWorkItem } from '../kernel/types';
 import { HeartbeatQueryRepository } from './repositories/heartbeats.ts';
 import { EventQueryRepository } from './repositories/events.ts';
 import { setupFTS5 } from './fts.ts';
+import { SemanticCache } from '../kernel/cache';
 
 /**
  * Ivy Heartbeat's interface to the blackboard.
@@ -66,13 +70,15 @@ export class Blackboard {
   readonly db: Database;
   readonly heartbeatQueries: HeartbeatQueryRepository;
   readonly eventQueries: EventQueryRepository;
+  readonly semanticCache: SemanticCache;
 
   constructor(dbPath?: string) {
     const resolved = dbPath ?? resolveDbPath();
     this.db = openDatabase(resolved);
     setupFTS5(this.db);
+    this.semanticCache = new SemanticCache(this.db);
     this.heartbeatQueries = new HeartbeatQueryRepository(this.db);
-    this.eventQueries = new EventQueryRepository(this.db);
+    this.eventQueries = new EventQueryRepository(this.db, this.semanticCache);
   }
 
   // ─── Agent lifecycle (delegated to ivy-blackboard) ─────────────────────
@@ -92,58 +98,81 @@ export class Blackboard {
   // ─── Work items (delegated to ivy-blackboard) ───────────────────────────
 
   createWorkItem(opts: CreateWorkItemOptions): CreateWorkItemResult {
+    this.semanticCache.clearByPrefix('work:');
     return createWorkItem(this.db, opts);
   }
 
   listWorkItems(opts?: ListWorkItemsOptions): BlackboardWorkItem[] {
-    return listWorkItems(this.db, opts);
+    const cacheKey = 'work:list:' + JSON.stringify(opts ?? {});
+    const cached = this.semanticCache.get<BlackboardWorkItem[]>(cacheKey);
+    if (cached) return cached;
+
+    const results = listWorkItems(this.db, opts);
+    this.semanticCache.set(cacheKey, [], results, 30); // 30s TTL for work items
+    return results;
   }
 
   claimWorkItem(itemId: string, sessionId: string): ClaimWorkItemResult {
+    this.semanticCache.clearByPrefix('work:');
     return claimWorkItem(this.db, itemId, sessionId);
   }
 
   completeWorkItem(itemId: string, sessionId: string): CompleteWorkItemResult {
+    this.semanticCache.clearByPrefix('work:');
     return completeWorkItem(this.db, itemId, sessionId);
   }
 
-  releaseWorkItem(itemId: string, sessionId: string): ReleaseWorkItemResult {
-    return releaseWorkItem(this.db, itemId, sessionId);
+  releaseWorkItem(itemId: string, sessionId: string, opts?: { reason?: string; noProgress?: boolean; actorId?: string }): WorkItemReleaseResult {
+    this.semanticCache.clearByPrefix('work:');
+    return releaseWorkItem(this.db, itemId, sessionId, opts);
+  }
+
+  failWorkItem(itemId: string, sessionId: string, opts?: { reason?: string }): FailWorkItemResult {
+    this.semanticCache.clearByPrefix('work:');
+    return failWorkItem(this.db, itemId, sessionId, opts);
   }
 
   blockWorkItem(itemId: string, opts?: { blockedBy?: string }): BlockWorkItemResult {
+    this.semanticCache.clearByPrefix('work:');
     return blockWorkItem(this.db, itemId, opts);
   }
 
   unblockWorkItem(itemId: string): UnblockWorkItemResult {
+    this.semanticCache.clearByPrefix('work:');
     return unblockWorkItem(this.db, itemId);
   }
 
   setWaitingForResponse(itemId: string, opts?: { blockedBy?: string }): SetWaitingResult {
+    this.semanticCache.clearByPrefix('work:');
     return setWaitingForResponse(this.db, itemId, opts);
   }
 
   updateWorkItemMetadata(itemId: string, updates: Record<string, unknown>): UpdateWorkItemMetadataResult {
+    this.semanticCache.clear(true);
     return updateWorkItemMetadata(this.db, itemId, updates);
   }
 
   // ─── Phase 1: Approval workflow ─────────────────────────────────────────────
 
   requestApproval(itemId: string, request: Record<string, unknown>): RequestApprovalResult {
+    this.semanticCache.clearByPrefix('work:');
     return requestApproval(this.db, itemId, request);
   }
 
   approveWorkItem(itemId: string): ApproveWorkItemResult {
+    this.semanticCache.clearByPrefix('work:');
     return approveWorkItem(this.db, itemId);
   }
 
   rejectWorkItem(itemId: string): RejectWorkItemResult {
+    this.semanticCache.clearByPrefix('work:');
     return rejectWorkItem(this.db, itemId);
   }
 
   // ─── Phase 1: Agent handover ───────────────────────────────────────────────
 
   handoverWorkItem(itemId: string, sessionId: string, context: Record<string, unknown>): HandoverWorkItemResult {
+    this.semanticCache.clearByPrefix('work:');
     return handoverWorkItem(this.db, itemId, sessionId, context);
   }
 
@@ -167,6 +196,7 @@ export class Blackboard {
    */
   completeWaitingItem(itemId: string): void {
     const now = new Date().toISOString();
+    this.semanticCache.clearByPrefix('work:');
     const result = this.db.query(
       "UPDATE work_items SET status = 'completed', completed_at = ? WHERE item_id = ? AND status = 'waiting_for_response'"
     ).run(now, itemId);
@@ -189,27 +219,32 @@ export class Blackboard {
     return listProjects(this.db);
   }
 
-  // ─── Event appending (direct SQL — works around CHECK constraint) ──────
+  // ─── Event appending ────────────────────────────────────────────────
 
   /**
-   * Append a heartbeat-specific event.
-   * Uses ivy-blackboard's 'heartbeat_received' event type since custom
-   * types are blocked by CHECK constraint (see issue #2).
+   * Append an event to the blackboard event log.
+   * Accepts an optional eventType (defaults to 'heartbeat_received' for
+   * backward compatibility). Now that migration V2 dropped the event_type
+   * CHECK constraint, any string is valid — callers should pass a
+   * meaningful type from KNOWN_EVENT_TYPES where possible.
    */
   appendEvent(opts: {
     actorId?: string;
     targetId?: string;
     summary: string;
     metadata?: Record<string, unknown>;
+    eventType?: string;
   }): void {
     const now = new Date().toISOString();
+    const eventType = opts.eventType ?? 'heartbeat_received';
     this.db
       .prepare(
         `INSERT INTO events (timestamp, event_type, actor_id, target_id, target_type, summary, metadata)
-         VALUES (?, 'heartbeat_received', ?, ?, 'agent', ?, ?)`
+         VALUES (?, ?, ?, ?, 'agent', ?, ?)`
       )
       .run(
         now,
+        eventType,
         opts.actorId ?? null,
         opts.targetId ?? null,
         opts.summary,
@@ -246,6 +281,8 @@ export type {
   ClaimWorkItemResult,
   CompleteWorkItemResult,
   ReleaseWorkItemResult,
+  FailWorkItemResult,
+  WorkItemReleaseResult,
   BlockWorkItemResult,
   UnblockWorkItemResult,
   SetWaitingResult,

@@ -34,7 +34,7 @@ describe("schema SQL constants", () => {
     expect(timeout.timeout).toBe(5000);
   });
 
-  it("CREATE_TABLES_SQL creates all 7 tables", () => {
+  it("CREATE_TABLES_SQL creates all 9 tables", () => {
     for (const sql of PRAGMA_SQL) {
       db.exec(sql);
     }
@@ -55,7 +55,8 @@ describe("schema SQL constants", () => {
     expect(names).toContain("steering_rules");
     expect(names).toContain("schema_version");
     expect(names).toContain("snapshots");
-    expect(names).toHaveLength(8);
+    expect(names).toContain("semantic_cache");
+    expect(names).toHaveLength(9);
   });
 
   it("CREATE_INDEXES_SQL creates all expected indexes", () => {
@@ -98,8 +99,8 @@ describe("schema SQL constants", () => {
     expect(version.version).toBe(1);
   });
 
-  it("CURRENT_SCHEMA_VERSION equals 7", () => {
-    expect(CURRENT_SCHEMA_VERSION).toBe(7);
+  it("CURRENT_SCHEMA_VERSION equals 8", () => {
+    expect(CURRENT_SCHEMA_VERSION).toBe(8);
   });
 });
 

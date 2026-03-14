@@ -1,0 +1,72 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "SemanticCacheConfiguration",
+  "description": "Strict configuration for the high-performance semantic cache layer.",
+  "type": "object",
+  "properties": {
+    "embedding_model": {
+      "type": "string",
+      "enum": ["text-embedding-3-small", "text-embedding-3-large", "text-embedding-ada-002"],
+      "default": "text-embedding-3-small"
+    },
+    "similarity": {
+      "type": "object",
+      "properties": {
+        "metric": {
+          "type": "string",
+          "enum": ["cosine", "euclidean", "dot"],
+          "default": "cosine"
+        },
+        "default_threshold": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.88
+        },
+        "background_refresh_buffer": {
+          "type": "number",
+          "description": "Similarity buffer below threshold to trigger background refresh.",
+          "minimum": 0,
+          "maximum": 0.05,
+          "default": 0.02
+        }
+      },
+      "required": ["metric", "default_threshold"]
+    },
+    "storage": {
+      "type": "object",
+      "properties": {
+        "vector_db": {
+          "type": "object",
+          "properties": {
+            "provider": { "type": "string", "const": "qdrant" },
+            "collection_name": { "type": "string", "default": "semantic_cache_v1" },
+            "hnsw_m": { "type": "integer", "default": 16 },
+            "hnsw_ef": { "type": "integer", "default": 128 }
+          }
+        },
+        "fast_cache": {
+          "type": "object",
+          "properties": {
+            "provider": { "type": "string", "const": "redis" },
+            "ttl_fast": { "type": "integer", "default": 3600 }
+          }
+        }
+      }
+    },
+    "volatility_profiles": {
+      "type": "object",
+      "patternProperties": {
+        "^[A-Za-z0-9_-]+$": {
+          "type": "object",
+          "properties": {
+            "epsilon_base": { "type": "number", "minimum": 0.7, "maximum": 1.0 },
+            "lambda": { "type": "number" }
+          },
+          "required": ["epsilon_base", "lambda"]
+        }
+      }
+    }
+  },
+  "required": ["embedding_model", "similarity", "storage", "volatility_profiles"]
+}

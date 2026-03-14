@@ -127,10 +127,20 @@ function extractKeywords(description: string): string[] {
 
 /**
  * Detect whether a persona is a sub-agent (not eligible for bidding).
+ * Personas containing "Researcher" are allowed even if they have sub-agent markers.
  */
-function isSubAgent(description: string): boolean {
+function isSubAgent(description: string, name: string): boolean {
     const lower = description.toLowerCase();
-    return SUB_AGENT_MARKERS.some(marker => lower.includes(marker));
+
+    // Explicit sub-agent markers always take precedence — even for researcher personas.
+    // e.g. "Called BY Research skill workflows only" marks ClaudeResearcher as non-dispatchable.
+    if (SUB_AGENT_MARKERS.some(marker => lower.includes(marker))) return true;
+
+    // Researcher personas without sub-agent markers are dispatchable (e.g. a first-class research agent).
+    const isResearcher = name.toLowerCase().includes('researcher') || lower.includes('research');
+    if (isResearcher) return false;
+
+    return false;
 }
 
 /**
@@ -194,7 +204,7 @@ export function loadPersona(name: string): PersonaBlock | null {
         background,
         keywords: extractKeywords(description),
         identityBlock: stripBoilerplate(body),
-        dispatchable: !isSubAgent(description),
+        dispatchable: !isSubAgent(description, name),
     };
 }
 
@@ -274,23 +284,42 @@ export function scoreBid(
 export function selectPersona(
     metadata: string | null,
     title: string,
-    description: string
+    description: string,
+    excludeNames: string[] = []
 ): PersonaBlock | null {
-    // 1. Explicit override from metadata
+    const excluded = new Set(excludeNames.map(n => n.toLowerCase()));
+
+    // 1. Explicit override from metadata (skip if that persona already failed)
     if (metadata) {
         try {
             const parsed = JSON.parse(metadata);
             if (parsed.agent_persona && typeof parsed.agent_persona === 'string') {
-                return loadPersona(parsed.agent_persona);
+                if (!excluded.has(parsed.agent_persona.toLowerCase())) {
+                    return loadPersona(parsed.agent_persona);
+                }
+                // Persona is excluded — fall through to bidding with rotation
             }
         } catch {
             // Not valid JSON — proceed to bidding
         }
     }
 
-    // 2. Run bidding
-    const candidates = loadAllDispatchable();
+    // 2. Run bidding (exclude failed personas)
+    const allCandidates = loadAllDispatchable();
+    const candidates = excluded.size > 0
+        ? allCandidates.filter(p => !excluded.has(p.name.toLowerCase()))
+        : allCandidates;
+
     if (candidates.length === 0) {
+        // All personas excluded — last resort: use best scorer from full pool
+        if (allCandidates.length > 0) {
+            const scored = allCandidates.map(p => ({
+                persona: p,
+                score: scoreBid(p, title, description),
+            }));
+            scored.sort((a, b) => b.score - a.score);
+            return scored[0]!.persona;
+        }
         return loadPersona(DEFAULT_PERSONA);
     }
 
@@ -308,8 +337,11 @@ export function selectPersona(
         return best.persona;
     }
 
-    // 3. Fallback to default
-    return loadPersona(DEFAULT_PERSONA) ?? candidates[0] ?? null;
+    // 3. Fallback to default (if not excluded), otherwise first candidate
+    if (!excluded.has(DEFAULT_PERSONA.toLowerCase())) {
+        return loadPersona(DEFAULT_PERSONA) ?? candidates[0] ?? null;
+    }
+    return candidates[0] ?? null;
 }
 
 /**

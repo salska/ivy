@@ -43,7 +43,16 @@ function formatToolUse(block: any): string {
  */
 function formatStreamMessage(msg: any): string | null {
   switch (msg.type) {
+    case 'message': {
+      // Handle top-level text messages (Gemini CLI)
+      return msg.content ?? null;
+    }
+    case 'tool_use': {
+      // Handle top-level tool calls (Gemini CLI)
+      return formatToolUse(msg);
+    }
     case 'assistant': {
+      // Handle Claude-style nested content
       const content = msg.message?.content ?? [];
       const parts: string[] = [];
 
@@ -58,17 +67,20 @@ function formatStreamMessage(msg: any): string | null {
       return parts.length > 0 ? parts.join('\n') : null;
     }
     case 'tool_result': {
-      // Log errors; skip successful results (too verbose)
-      if (msg.is_error) {
-        const text = Array.isArray(msg.content)
-          ? msg.content.map((c: any) => c.text ?? '').join('')
-          : String(msg.content ?? 'unknown error');
-        return `[tool:error] ${text.slice(0, 300)}`;
+      // Log errors with high priority. Log successes as [tool:ok] for monitoring.
+      const isError = msg.is_error === true || msg.status === 'error';
+      const text = Array.isArray(msg.content)
+        ? msg.content.map((c: any) => c.text ?? '').join('')
+        : String(msg.content ?? msg.output ?? msg.error?.message ?? msg.result ?? 'success');
+
+      if (isError) {
+        return `[tool:error] ${text.slice(0, 400)}`;
       }
-      return null;
+      // For success, just show a tiny snippet or name if available
+      return `[tool:ok] ${msg.tool_use_id ? `(${msg.tool_use_id}) ` : ''}${text.slice(0, 100)}`;
     }
     case 'result': {
-      const text = msg.result ?? '';
+      const text = msg.result ?? msg.content ?? '';
       if (!text) return null;
       return `\n--- RESULT ---\n${text}`;
     }
@@ -204,7 +216,12 @@ async function defaultLauncher(opts: LaunchOptions): Promise<LaunchResult> {
     cwd: opts.workDir,
     stdout: 'pipe',
     stderr: 'pipe',
-    env: { ...process.env },
+    env: {
+      ...process.env,
+      // Fix for Node.js DNS resolution issues (ENOTFOUND) specifically when hitting
+      // internal/Google APIs from node-based CLI tools (like the Gemini CLI)
+      NODE_OPTIONS: `${process.env.NODE_OPTIONS || ''} --dns-result-order=ipv4first`.trim()
+    },
   });
 
   // Set up timeout
@@ -250,4 +267,33 @@ export function setLauncher(launcher: SessionLauncher): void {
  */
 export function resetLauncher(): void {
   currentLauncher = defaultLauncher;
+}
+
+/**
+ * Check if a session log contains evidence of tool usage.
+ * Returns false if the agent never invoked a single tool — a strong signal
+ * that it did no meaningful work (e.g. just output a generic "how can I help" message).
+ */
+export function hasToolUsage(sessionId: string): boolean {
+  try {
+    const { readFileSync } = require('node:fs');
+    const logPath = logPathForSession(sessionId);
+    const content = readFileSync(logPath, 'utf-8');
+    // Check for multiple indicators of life:
+    // 1. [tool] - our canonical prefix from formatStreamMessage
+    // 2. </tool> or </tools> - common XML markers used by internal Gemini CLI tools
+    // 3. PHASE_REPORT: or HANDOVER_CONTEXT: - structured agent reports
+    const patterns = [
+      /\[tool\]/i,
+      /<\/tool>/i,
+      /<\/tools>/i,
+      /PHASE_REPORT:/i,
+      /HANDOVER_CONTEXT:/i
+    ];
+
+    return patterns.some(p => p.test(content));
+  } catch {
+    // If log doesn't exist or can't be read, assume tools were used (fail open)
+    return true;
+  }
 }

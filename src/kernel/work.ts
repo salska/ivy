@@ -286,10 +286,21 @@ export function createAndClaimWorkItem(
 }
 
 export interface ReleaseWorkItemResult {
+  outcome: 'released';
   item_id: string;
   released: boolean;
   previous_status: string;
 }
+
+export interface FailWorkItemResult {
+  outcome: 'failed';
+  item_id: string;
+  failed: boolean;
+  previous_status: string;
+}
+
+/** Discriminated union for releaseWorkItem — check `outcome` to distinguish release vs stagnation-fail. */
+export type WorkItemReleaseResult = ReleaseWorkItemResult | FailWorkItemResult;
 
 export interface CompleteWorkItemResult {
   item_id: string;
@@ -313,12 +324,121 @@ export interface UnblockWorkItemResult {
 
 /**
  * Release a claimed work item back to available.
+ * 
+ * If noProgress is true:
+ * - Increments stagnation_count
+ * - Appends the actorId (usually sessionId, or persona name) to failed_by array.
+ * - If stagnation reaches MAX_STAGNATION, transitions to failed instead.
  */
 export function releaseWorkItem(
   db: Database,
   itemId: string,
-  sessionId: string
-): ReleaseWorkItemResult {
+  sessionId: string,
+  opts?: { reason?: string; noProgress?: boolean; actorId?: string }
+): WorkItemReleaseResult {
+  const item = db
+    .query("SELECT * FROM work_items WHERE item_id = ?")
+    .get(itemId) as BlackboardWorkItem | null;
+
+  if (!item) {
+    throw new BlackboardError(`Work item not found: ${itemId}`, "WORK_ITEM_NOT_FOUND");
+  }
+
+  const agent = db
+    .query("SELECT session_id FROM agents WHERE session_id = ?")
+    .get(sessionId) as { session_id: string } | null;
+
+  if (!agent) {
+    throw new BlackboardError(`Agent session not found: ${sessionId}`, "AGENT_NOT_FOUND");
+  }
+
+  if (item.status === "completed") {
+    throw new BlackboardError(`Work item already completed: ${itemId}`, "ALREADY_COMPLETED");
+  }
+
+  if (item.status !== "claimed") {
+    throw new BlackboardError(`Work item is not claimed: ${itemId}`, "NOT_CLAIMED");
+  }
+
+  if (item.claimed_by !== sessionId) {
+    throw new BlackboardError(`Work item not claimed by session: ${sessionId}`, "NOT_CLAIMED_BY_SESSION");
+  }
+
+  const now = new Date().toISOString();
+  const previousStatus = item.status;
+
+  // Stagnation checking
+  if (opts?.noProgress) {
+    let metadataObj: any = {};
+    if (item.metadata) {
+      try { metadataObj = JSON.parse(item.metadata); } catch { /* ignore */ }
+    }
+
+    const maxStagnation = 3;
+    const currentStagnation = (metadataObj.stagnation_count ?? 0) + 1;
+
+    // Always log the failure to the actor blacklist
+    const failedBy = metadataObj.failed_by ?? [];
+    const actorId = opts.actorId ?? sessionId;
+    if (!failedBy.includes(actorId)) {
+      failedBy.push(actorId);
+    }
+
+    metadataObj.stagnation_count = currentStagnation;
+    metadataObj.failed_by = failedBy;
+    const newMetadata = JSON.stringify(metadataObj);
+
+    if (currentStagnation > maxStagnation) {
+      // Automatically fail the item instead of releasing
+      return db.transaction(() => {
+        db.query(
+          "UPDATE work_items SET status = 'failed', claimed_by = NULL, claimed_at = NULL, metadata = ? WHERE item_id = ?"
+        ).run(newMetadata, itemId);
+
+        const agentRow = db.query("SELECT agent_name FROM agents WHERE session_id = ?").get(sessionId) as { agent_name: string } | null;
+        const agentName = agentRow?.agent_name ?? sessionId.slice(0, 12);
+        const reasonFragment = opts.reason ? ` (${opts.reason})` : "";
+        const summary = `Work item "${item.title}" failed due to stagnation (max failures reached) from agent ${agentName}${reasonFragment}`;
+
+        db.query(
+          "INSERT INTO events (timestamp, event_type, actor_id, target_id, target_type, summary) VALUES (?, 'work_failed', ?, ?, 'work_item', ?)"
+        ).run(now, sessionId, itemId, summary);
+
+        return { outcome: 'failed' as const, item_id: itemId, failed: true, previous_status: previousStatus };
+      })();
+    } else {
+      // Update metadata and continue to release
+      db.query("UPDATE work_items SET metadata = ? WHERE item_id = ?").run(newMetadata, itemId);
+    }
+  }
+
+  db.transaction(() => {
+    db.query(
+      "UPDATE work_items SET status = 'available', claimed_by = NULL, claimed_at = NULL WHERE item_id = ?"
+    ).run(itemId);
+
+    const agentRow = db.query("SELECT agent_name FROM agents WHERE session_id = ?").get(sessionId) as { agent_name: string } | null;
+    const agentName = agentRow?.agent_name ?? sessionId.slice(0, 12);
+    const reasonFragment = opts?.reason ? ` (Reason: ${opts.reason}${opts.noProgress ? ", No Progress" : ""})` : "";
+    const summary = `Work item "${item.title}" released by agent ${agentName}${reasonFragment}`;
+
+    db.query(
+      "INSERT INTO events (timestamp, event_type, actor_id, target_id, target_type, summary) VALUES (?, 'work_released', ?, ?, 'work_item', ?)"
+    ).run(now, sessionId, itemId, summary);
+  })();
+
+  return { outcome: 'released', item_id: itemId, released: true, previous_status: previousStatus };
+}
+
+/**
+ * Mark a work item as terminally failed.
+ */
+export function failWorkItem(
+  db: Database,
+  itemId: string,
+  sessionId: string,
+  opts?: { reason?: string }
+): FailWorkItemResult {
   const item = db
     .query("SELECT * FROM work_items WHERE item_id = ?")
     .get(itemId) as BlackboardWorkItem | null;
@@ -352,18 +472,20 @@ export function releaseWorkItem(
 
   db.transaction(() => {
     db.query(
-      "UPDATE work_items SET status = 'available', claimed_by = NULL, claimed_at = NULL WHERE item_id = ?"
+      "UPDATE work_items SET status = 'failed', claimed_by = NULL, claimed_at = NULL WHERE item_id = ?"
     ).run(itemId);
 
-    const agentRow = db.query("SELECT agent_name FROM agents WHERE session_id = ?").get(sessionId) as { agent_name: string } | null;
+    const agentRow = (db.query("SELECT agent_name FROM agents WHERE session_id = ?").get(sessionId) as { agent_name: string } | null);
     const agentName = agentRow?.agent_name ?? sessionId.slice(0, 12);
-    const summary = `Work item "${item.title}" released by agent ${agentName}`;
+    const reasonFragment = opts?.reason ? ` (${opts.reason})` : "";
+    const summary = `Work item "${item.title}" failed by agent ${agentName}${reasonFragment}`;
+
     db.query(
-      "INSERT INTO events (timestamp, event_type, actor_id, target_id, target_type, summary) VALUES (?, 'work_released', ?, ?, 'work_item', ?)"
+      "INSERT INTO events (timestamp, event_type, actor_id, target_id, target_type, summary) VALUES (?, 'work_failed', ?, ?, 'work_item', ?)"
     ).run(now, sessionId, itemId, summary);
   })();
 
-  return { item_id: itemId, released: true, previous_status: previousStatus };
+  return { outcome: 'failed', item_id: itemId, failed: true, previous_status: previousStatus };
 }
 
 /**

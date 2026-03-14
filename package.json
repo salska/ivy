@@ -28,6 +28,13 @@
   },
   "author": "Jens-Christian Fischer",
   "dependencies": {
+    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/exporter-trace-otlp-grpc": "^0.213.0",
+    "@opentelemetry/resources": "^2.6.0",
+    "@opentelemetry/sdk-node": "^0.213.0",
+    "@opentelemetry/sdk-trace-base": "^2.6.0",
+    "@opentelemetry/sdk-trace-node": "^2.6.0",
+    "@opentelemetry/semantic-conventions": "^1.40.0",
     "commander": "^14.0.3",
     "js-yaml": "^4.1.1",
     "pai-content-filter": "github:jcfischer/pai-content-filter",

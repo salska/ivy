@@ -8,6 +8,7 @@ import { loadPersona } from '../scheduler/persona-loader.ts';
 
 // Kernel imports for blackboard API routes
 import { getOverallStatus } from '../../kernel/status';
+import { getHealthStatus } from '../../kernel/health';
 import { listAgents } from '../../kernel/agent';
 import {
     listWorkItems, getWorkItemStatus, deleteWorkItem,
@@ -301,6 +302,10 @@ export function startUnifiedServer(
 
                 if (path === '/api/status') {
                     return jsonOk(getOverallStatus(db, dbPath), 200, cors);
+                }
+
+                if (path === '/api/health') {
+                    return jsonOk(getHealthStatus(db), 200, cors);
                 }
 
                 if (path === '/api/agents') {

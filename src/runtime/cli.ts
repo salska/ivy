@@ -34,6 +34,7 @@ import { registerDispatchWorkerCommand } from './commands/dispatch-worker.ts';
 import { registerSpecFlowQueueCommand } from './commands/specflow-queue.ts';
 import { registerKaiManualCommand } from './commands/kai-manual.ts';
 import { registerSkillsCommand } from './commands/skills.ts';
+import { registerCacheCommands } from './commands/cache.ts';
 
 // ─── Migrated blackboard commands ────────────────────────────────────
 import { registerWorkCommands } from './commands/work.ts';
@@ -133,6 +134,7 @@ registerDispatchWorkerCommand(program, getContext);
 registerSpecFlowQueueCommand(program, getContext);
 registerKaiManualCommand(program, getContext);
 registerSkillsCommand(program, getContext);
+registerCacheCommands(program, getContext);
 
 // ─── Plugin loading (async, then parse) ──────────────────────────────
 

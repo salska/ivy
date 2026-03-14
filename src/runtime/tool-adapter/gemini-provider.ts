@@ -67,13 +67,14 @@ export const geminiProvider: ProviderAdapter = {
 
     parseToolUse(block: unknown): ToolCall | null {
         const b = block as Record<string, unknown>;
-        if (b?.type !== 'tool_use' || typeof b.name !== 'string') return null;
+        const name = (b.tool_name ?? b.name) as string | undefined;
+        if ((b.type !== 'tool_use' && !b.tool_name) || !name) return null;
 
         // Normalize native Gemini tool name → canonical Claude name
-        const canonicalName = GEMINI_TO_CLAUDE[b.name] ?? b.name;
+        const canonicalName = GEMINI_TO_CLAUDE[name] ?? name;
 
         // Map Gemini input field names → Claude input field names
-        const rawInput = (b.input as Record<string, unknown>) ?? {};
+        const rawInput = (b.parameters ?? b.input ?? {}) as Record<string, unknown>;
         const input = normalizeInput(canonicalName, rawInput);
 
         return { name: canonicalName, input };

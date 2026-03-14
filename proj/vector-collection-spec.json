@@ -1,0 +1,27 @@
+{
+  "name": "semantic_cache_v1",
+  "vectors": {
+    "size": 1536,
+    "distance": "Cosine",
+    "on_disk": true
+  },
+  "hnsw_config": {
+    "m": 16,
+    "ef_construct": 128,
+    "full_scan_threshold": 10000,
+    "max_indexing_threads": 4
+  },
+  "optimizers_config": {
+    "default_segment_number": 2,
+    "memmap_threshold": 20000,
+    "indexing_threshold": 10000
+  },
+  "payload_schema": {
+    "prompt_text": "text",
+    "completion": "text",
+    "model_id": "keyword",
+    "volatility_profile": "keyword",
+    "created_at": "integer",
+    "last_hit_at": "integer"
+  }
+}

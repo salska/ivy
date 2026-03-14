@@ -1,7 +1,8 @@
 import { mkdirSync, openSync, closeSync, appendFileSync } from 'node:fs';
 import type { Blackboard } from '../blackboard.ts';
 import type { BlackboardWorkItem } from '../../kernel/types';
-import { getLauncher, resolveLogDir, logPathForSession } from './launcher.ts';
+import { getLauncher, resolveLogDir, logPathForSession, hasToolUsage } from './launcher.ts';
+import { isMeaninglessHandover, parsePhaseReport } from '../parser/handover-parser.ts';
 import { loadAlgorithmTemplate } from '../hooks/pre-session.ts';
 import { buildPromptPreamble } from '../tool-adapter/index.ts';
 import {
@@ -21,7 +22,7 @@ import {
   buildCommentPrompt,
 } from './worktree.ts';
 import { parseSpecFlowMeta } from './specflow-types.ts';
-import { runSpecFlowPhase } from './specflow-runner.ts';
+import { runSpecFlowPhase, SpecFlowError } from './specflow-runner.ts';
 import { parseMergeFixMeta, createMergeFixWorkItem, runMergeFix } from './merge-fix.ts';
 import { selectPersona } from './persona-loader.ts';
 import { updateWorkItemMetadata } from '../../kernel/work.ts';
@@ -153,7 +154,11 @@ function buildPrompt(item: BlackboardWorkItem, sessionId: string, db: import('bu
   }
 
   parts.push(
-    `\nWhen you are done, summarize what you accomplished.`,
+    `When you are done, summarize what you accomplished.`,
+    `If you cannot complete the task and need to hand it off, output a string exactly starting with HANDOVER_CONTEXT: on its own line.`,
+    `Below that line, provide three fields: progress:, next_steps:, and blockers: (if any).`,
+    `Make sure the values for these fields are on the same line as the key or on following lines.`,
+    `Do not wrap this in a code block unless necessary.`
   );
 
   return { prompt: parts.join('\n'), personaName: persona?.name ?? null };
@@ -186,11 +191,19 @@ export async function dispatch(
   };
 
   // Query available work items
-  const items = bb.listWorkItems({
+  let items = bb.listWorkItems({
     status: 'available',
     priority: opts.priority,
     project: opts.project,
   });
+
+  // Filter out items that are stagnated/failed by the globally running personas/agents
+  // Note: we can only truly filter them out before selecting a persona, so we 
+  // do a best-effort pass here if we know the agent session ID in worker mode, 
+  // but wait, the dispatcher spawns *new* sessions. 
+  // Instead, the best we can do is skip them inside the loop if the selected 
+  // persona matches a failed_by entry.
+
 
   if (items.length === 0) {
     return result;
@@ -284,6 +297,41 @@ export async function dispatch(
       continue;
     }
 
+    // ─── Stagnation-Aware Persona Selection (applies to ALL dispatch modes) ───
+    // Extract failed_by to enable persona rotation instead of outright blocking.
+    let failedBy: string[] = [];
+    if (item.metadata) {
+      try {
+        const metaObj = JSON.parse(item.metadata);
+        if (Array.isArray(metaObj.failed_by)) {
+          failedBy = metaObj.failed_by;
+        }
+      } catch { /* ignore */ }
+    }
+
+    // Select persona with exclusion — will rotate to a different persona if available
+    {
+      const persona = selectPersona(item.metadata, item.title, item.description ?? '', failedBy);
+      const identifier = persona?.name ?? sessionId;
+
+      // Only block if the rotated persona is still in the failed list
+      // (meaning all personas have been tried, or no rotation happened)
+      if (failedBy.length > 0 && failedBy.includes(identifier)) {
+        try {
+          bb.releaseWorkItem(item.item_id, sessionId, { reason: "All personas exhausted — no untried persona available" });
+        } catch { /* best effort */ }
+
+        result.skipped.push({
+          itemId: item.item_id,
+          title: item.title,
+          reason: `all personas exhausted (tried: ${failedBy.join(', ')})`,
+        });
+
+        bb.deregisterAgent(sessionId);
+        continue;
+      }
+    }
+
     // Log dispatch event
     bb.appendEvent({
       actorId: sessionId,
@@ -340,6 +388,7 @@ export async function dispatch(
             stdout: 'ignore',
             stderr: logFd,
             stdin: 'ignore',
+            env: process.env, // explicitly forward environment variables
           });
           proc.unref();
         } finally {
@@ -418,14 +467,17 @@ export async function dispatch(
           }
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : String(err);
-          const durationMs = Date.now() - startTime;
-          try { bb.releaseWorkItem(item.item_id, sessionId); } catch { /* best effort */ }
+          const noProgress = err instanceof SpecFlowError ? err.noProgress : true; // assume no progress for other errors
+
+          try {
+            bb.releaseWorkItem(item.item_id, sessionId, { reason: `SpecFlow error: ${msg}`, noProgress });
+          } catch { /* best effort */ }
 
           bb.appendEvent({
             actorId: sessionId,
             targetId: item.item_id,
             summary: `SpecFlow phase "${sfMeta.specflow_phase}" error: ${msg}`,
-            metadata: { error: msg, durationMs },
+            metadata: { error: msg, durationMs: Date.now() - startTime },
           });
 
           result.errors.push({
@@ -468,7 +520,14 @@ export async function dispatch(
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : String(err);
           const durationMs = Date.now() - startTime;
-          try { bb.releaseWorkItem(item.item_id, sessionId); } catch { /* best effort */ }
+
+          try {
+            bb.releaseWorkItem(item.item_id, sessionId, {
+              reason: `Merge-fix failed: ${msg}`,
+              noProgress: true
+            });
+          } catch { /* best effort */ }
+
           bb.appendEvent({
             actorId: sessionId,
             targetId: item.item_id,
@@ -497,6 +556,8 @@ export async function dispatch(
           // Non-fatal: best effort metadata update
         }
       }
+
+
 
       // Worktree setup for GitHub items
       const ghMeta = parseGithubMeta(item.metadata);
@@ -534,6 +595,35 @@ export async function dispatch(
           bb.deregisterAgent(sessionId);
           continue;
         }
+      }
+
+      // Validate that the resolved work directory actually exists
+      if (!require('node:fs').existsSync(resolvedWorkDir)) {
+        const msg = `Project directory does not exist: ${resolvedWorkDir}`;
+        bb.appendEvent({
+          actorId: sessionId,
+          targetId: item.item_id,
+          summary: `Dispatch worker failed: ${msg}`,
+          metadata: { error: msg, missingDir: resolvedWorkDir },
+        });
+        try { bb.releaseWorkItem(item.item_id, sessionId, { reason: msg, noProgress: true, actorId: personaName ?? sessionId }); } catch { /* best effort */ }
+
+        result.errors.push({
+          itemId: item.item_id,
+          title: item.title,
+          error: msg,
+        });
+
+        // Cleanup any partial github setups
+        if (worktreePath) {
+          try { await removeWorktree(ghProjectPath, worktreePath); } catch { /* best effort */ }
+        }
+        if (didStash) {
+          await popStash(ghProjectPath);
+        }
+
+        bb.deregisterAgent(sessionId);
+        continue;
       }
 
       try {
@@ -678,7 +768,7 @@ export async function dispatch(
               }
             } catch (gitErr: unknown) {
               const msg = gitErr instanceof Error ? gitErr.message : String(gitErr);
-              bb.releaseWorkItem(item.item_id, sessionId);
+              bb.releaseWorkItem(item.item_id, sessionId, { reason: "Post-agent git ops failed", noProgress: true, actorId: personaName ?? sessionId });
               bb.deregisterAgent(sessionId);
               result.errors.push({
                 itemId: item.item_id,
@@ -691,6 +781,101 @@ export async function dispatch(
               }
               continue;
             }
+          }
+
+          // No-work safeguard: if the agent used zero tools, release instead of completing.
+          if (!hasToolUsage(sessionId)) {
+            bb.appendEvent({
+              actorId: sessionId,
+              targetId: item.item_id,
+              summary: `Agent exited 0 but used no tools for "${item.title}" — releasing as no-progress`,
+              metadata: { itemId: item.item_id, exitCode: 0, durationMs, noWorkDetected: true },
+            });
+            try {
+              bb.releaseWorkItem(item.item_id, sessionId, {
+                reason: 'Agent exited successfully but used no tools (no meaningful work)',
+                noProgress: true,
+                actorId: personaName ?? sessionId,
+              });
+            } catch { /* best effort */ }
+            bb.deregisterAgent(sessionId);
+            result.errors.push({
+              itemId: item.item_id,
+              title: item.title,
+              error: 'Agent exited 0 but used no tools (no meaningful work)',
+            });
+            continue;
+          }
+
+          // --- HANDOVER ON SUCCESS ---
+          // Check if agent did meaningful work but wants to hand over to another persona
+          let didHandover = false;
+          try {
+            const { readFileSync } = require('node:fs');
+            const logContent = readFileSync(logPathForSession(sessionId), 'utf-8');
+            const handoverMatch = logContent.match(/HANDOVER_CONTEXT:\s*\n([\s\S]*?)(?:```|$)/);
+            if (handoverMatch) {
+              const block = handoverMatch[1]!;
+              let progress = block.match(/progress:\s*(.+)/)?.[1]?.trim() ?? '';
+              let nextSteps = block.match(/next_steps:\s*(.+)/)?.[1]?.trim() ?? '';
+              let blockers = block.match(/blockers:\s*(.+)/)?.[1]?.trim() ?? '';
+
+              // Validate: if they just copied placeholders, try to fallback to PHASE_REPORT
+              if (isMeaninglessHandover(progress) || isMeaninglessHandover(nextSteps)) {
+                const phaseReport = parsePhaseReport(logPathForSession(sessionId));
+                if (phaseReport.factsLearned.length > 0) {
+                  progress = `Completed phase: ${phaseReport.lastPhase}. Facts: ${phaseReport.factsLearned.join(', ')}`;
+                  nextSteps = 'Continue to next logical phase.';
+                } else if (!isMeaninglessHandover(progress)) {
+                  // Keep progress
+                } else {
+                  progress = 'Agent did not provide meaningful progress summary.';
+                  nextSteps = 'Check logs for details.';
+                }
+              }
+
+              // Update metadata with the block context and clear agent_persona override
+              // so the next dispatch runs a fresh bidding cycle
+              bb.updateWorkItemMetadata(item.item_id, {
+                handover_context: JSON.stringify({
+                  progress,
+                  next_steps: nextSteps,
+                  blockers,
+                  previous_agent: sessionId,
+                  handed_over_at: new Date().toISOString(),
+                }),
+                agent_persona: null,
+              });
+
+              bb.appendEvent({
+                actorId: sessionId,
+                targetId: item.item_id,
+                summary: `Agent handed over task successfully (progress: ${progress.slice(0, 50)}${progress.length > 50 ? '...' : ''})`,
+                metadata: { handover: true, exitCode: 0 },
+              });
+
+              bb.releaseWorkItem(item.item_id, sessionId, {
+                reason: 'Agent requested handover to next persona on success',
+                actorId: personaName ?? sessionId,
+              });
+              
+              didHandover = true;
+            }
+          } catch { /* ignore parsing/fs errors */ }
+
+          if (didHandover) {
+            bb.deregisterAgent(sessionId);
+            
+            result.dispatched.push({
+              itemId: item.item_id,
+              title: item.title,
+              projectId: item.project_id ?? '(none)',
+              sessionId,
+              exitCode: 0,
+              completed: false, // Handed over, not truly completed
+              durationMs,
+            });
+            continue;
           }
 
           bb.completeWorkItem(item.item_id, sessionId);
@@ -712,12 +897,28 @@ export async function dispatch(
             durationMs,
           });
         } else {
-          bb.releaseWorkItem(item.item_id, sessionId);
+          // Progress evaluation: if exit != 0, check if git tree changed as a rudimentary metric
+          let noProgress = true;
+          try {
+            const diffSummary = await getDiffSummary(workDir, mainBranch ?? 'HEAD');
+            // diffSummary is a string from git diff --stat. Check if it's non-empty.
+            if (diffSummary && diffSummary.trim().length > 0) {
+              noProgress = false; // Progress was made (files changed) despite the exit code
+            }
+          } catch {
+            // Default to assuming no progress if we can't check
+          }
+
+          bb.releaseWorkItem(item.item_id, sessionId, {
+            reason: `Claude exited with code ${launchResult.exitCode}`,
+            noProgress,
+            actorId: personaName ?? sessionId
+          });
 
           bb.appendEvent({
             actorId: sessionId,
             targetId: item.item_id,
-            summary: `Failed "${item.title}" (exit ${launchResult.exitCode}, ${Math.round(durationMs / 1000)}s)`,
+            summary: `Failed "${item.title}" (exit ${launchResult.exitCode}, ${Math.round(durationMs / 1000)}s)${noProgress ? ' — No progress detected' : ' — Partial progress detected'}`,
             metadata: {
               itemId: item.item_id,
               exitCode: launchResult.exitCode,
@@ -738,7 +939,7 @@ export async function dispatch(
         const msg = err instanceof Error ? err.message : String(err);
         const durationMs = Date.now() - startTime;
 
-        try { bb.releaseWorkItem(item.item_id, sessionId); } catch { /* best effort */ }
+        try { bb.releaseWorkItem(item.item_id, sessionId, { reason: `Dispatcher error: ${msg}`, noProgress: true, actorId: personaName ?? sessionId }); } catch { /* best effort */ }
         try { bb.deregisterAgent(sessionId); } catch { /* best effort */ }
 
         bb.appendEvent({

@@ -73,11 +73,11 @@ describe("Schema v6 migration", () => {
         expect(cols).toContain("metadata");
     });
 
-    test("schema version is 7", () => {
+    test("schema version is 8", () => {
         const row = db
             .query("SELECT MAX(version) as version FROM schema_version")
             .get() as { version: number };
-        expect(row.version).toBe(7);
+        expect(row.version).toBe(8);
     });
 });
 

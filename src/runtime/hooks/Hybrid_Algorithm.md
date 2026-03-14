@@ -10,6 +10,7 @@ in a structured `PHASE_REPORT` block at the end of your output.
 
 - Read the task description carefully
 - Identify the target project, files, and scope
+- **Audit existing artifacts**: Use `ls` and `view_file` to check for previous versions, design docs, or partial implementations.
 - Note any constraints or dependencies mentioned
 
 ### Phase 2: THINK

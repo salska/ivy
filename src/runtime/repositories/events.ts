@@ -1,5 +1,6 @@
 import type { Database } from 'bun:sqlite';
 import type { BlackboardEvent } from '../../kernel/types';
+import type { SemanticCache } from '../../kernel/cache';
 
 export interface ListOptions {
   limit?: number;
@@ -17,9 +18,11 @@ export interface SearchResult {
 
 export class EventQueryRepository {
   private readonly db: Database;
+  private readonly cache: SemanticCache;
 
-  constructor(db: Database) {
+  constructor(db: Database, cache: SemanticCache) {
     this.db = db;
+    this.cache = cache;
   }
 
   /**
@@ -27,6 +30,10 @@ export class EventQueryRepository {
    * Returns matching events ranked by relevance (lower rank = better match).
    */
   search(query: string, opts?: ListOptions): SearchResult[] {
+    // Check semantic cache first
+    const cached = this.cache.get<SearchResult[]>('events:search:' + query, [opts]);
+    if (cached) return cached;
+
     const limit = opts?.limit ? `LIMIT ${opts.limit}` : 'LIMIT 50';
     const sinceClause = opts?.since ? `AND e.timestamp > '${opts.since}'` : '';
 
@@ -41,7 +48,7 @@ export class EventQueryRepository {
     `;
 
     const rows = this.db.prepare(sql).all(query) as (BlackboardEvent & { rank: number })[];
-    return rows.map((row) => ({
+    const results = rows.map((row) => ({
       event: {
         id: row.id,
         timestamp: row.timestamp,
@@ -54,6 +61,11 @@ export class EventQueryRepository {
       } as BlackboardEvent,
       rank: row.rank,
     }));
+
+    // Cache the results (TTL: 60s for event searches as they are dynamic)
+    this.cache.set('events:search:' + query, [opts], results, 60);
+
+    return results;
   }
 
   /**

@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 import type { CliContext } from '../cli.ts';
-import { getLauncher, logPathForSession } from '../scheduler/launcher.ts';
+import { getLauncher, logPathForSession, hasToolUsage } from '../scheduler/launcher.ts';
 import { loadAlgorithmTemplate } from '../hooks/pre-session.ts';
 import {
   stashIfDirty,
@@ -24,6 +24,7 @@ import { getTanaAccessor } from '../evaluators/tana-accessor.ts';
 import { selectPersona } from '../scheduler/persona-loader.ts';
 import { updateWorkItemMetadata, handoverWorkItem } from '../../kernel/work.ts';
 import { createSnapshot } from '../../kernel/snapshot.ts';
+import { isMeaninglessHandover, parsePhaseReport } from '../parser/handover-parser.ts';
 
 /**
  * Parse work item metadata to extract GitHub-specific fields.
@@ -205,7 +206,18 @@ function buildPrompt(
   metadata?: string | null,
   handoverContext?: string | null
 ): { prompt: string; personaName: string | null } {
-  const persona = selectPersona(metadata ?? null, title, description ?? '');
+  // Extract failed_by list to exclude stagnated personas from selection
+  let excludePersonas: string[] = [];
+  if (metadata) {
+    try {
+      const parsed = JSON.parse(metadata);
+      if (Array.isArray(parsed.failed_by)) {
+        excludePersonas = parsed.failed_by;
+      }
+    } catch { /* ignore */ }
+  }
+
+  const persona = selectPersona(metadata ?? null, title, description ?? '', excludePersonas);
 
   const parts: string[] = [];
 
@@ -284,13 +296,10 @@ function buildPrompt(
   parts.push(
     TOOL_HINTS,
     `\nWhen you are done, summarize what you accomplished.`,
-    `\nIf you cannot complete the task and need to hand it off, output a HANDOVER_CONTEXT block:`,
-    `\`\`\``,
-    `HANDOVER_CONTEXT:`,
-    `progress: <what you accomplished>`,
-    `next_steps: <what still needs to be done>`,
-    `blockers: <any blockers>`,
-    `\`\`\``,
+    `If you cannot complete the task and need to hand it off, output a string exactly starting with HANDOVER_CONTEXT: on its own line.`,
+    `Below that line, provide three fields: progress:, next_steps:, and blockers: (if any).`,
+    `Make sure the values for these fields are on the same line as the key or on following lines.`,
+    `Do not wrap this in a code block unless necessary.`
   );
 
   return { prompt: parts.join('\n'), personaName: persona?.name ?? null };
@@ -300,46 +309,6 @@ function buildPrompt(
  * Parse the PHASE_REPORT block from agent output.
  * Returns the last phase reached and any facts learned.
  */
-function parsePhaseReport(logPath: string): {
-  lastPhase: string;
-  completed: boolean;
-  factsLearned: string[];
-  iscMet: string;
-} {
-  const defaults = { lastPhase: 'unknown', completed: false, factsLearned: [], iscMet: 'unknown' };
-  try {
-    const { readFileSync } = require('node:fs');
-    const content = readFileSync(logPath, 'utf-8');
-    const match = content.match(/PHASE_REPORT:\s*\n([\s\S]*?)(?:```|$)/);
-    if (!match) return defaults;
-
-    const block = match[1];
-    const phaseMatch = block.match(/last_phase:\s*(\w+)/);
-    const completedMatch = block.match(/completed:\s*(true|false)/);
-    const iscMatch = block.match(/isc_met:\s*(\w+)/);
-
-    // Extract facts_learned list items
-    const factsSection = block.match(/facts_learned:\s*\n((?:\s+-\s+.+\n?)*)/);
-    const factsLearned: string[] = [];
-    if (factsSection) {
-      const factLines = factsSection[1].match(/^\s+-\s+(.+)$/gm);
-      if (factLines) {
-        for (const line of factLines) {
-          factsLearned.push(line.replace(/^\s+-\s+/, '').trim());
-        }
-      }
-    }
-
-    return {
-      lastPhase: phaseMatch?.[1] ?? 'unknown',
-      completed: completedMatch?.[1] === 'true',
-      factsLearned,
-      iscMet: iscMatch?.[1] ?? 'unknown',
-    };
-  } catch {
-    return defaults;
-  }
-}
 
 /**
  * Hidden dispatch-worker subcommand.
@@ -525,6 +494,20 @@ export function registerDispatchWorkerCommand(
         } catch {
           // Non-fatal: best effort metadata update
         }
+      }
+
+      // Validate that the resolved work directory actually exists
+      if (!require('node:fs').existsSync(resolvedWorkDir)) {
+        const msg = `Project directory does not exist: ${resolvedWorkDir}`;
+        bb.appendEvent({
+          actorId: sessionId,
+          targetId: itemId,
+          summary: `Dispatch worker failed: ${msg}`,
+          metadata: { error: msg, missingDir: resolvedWorkDir },
+        });
+        try { bb.releaseWorkItem(itemId, sessionId, { reason: msg, noProgress: true, actorId: personaName ?? sessionId }); } catch { /* best effort */ }
+        try { bb.deregisterAgent(sessionId); } catch { /* best effort */ }
+        process.exit(1);
       }
 
       // Phase 1: Pre-dispatch snapshot for rollback capability
@@ -764,6 +747,95 @@ export function registerDispatchWorkerCommand(
             }
           }
 
+          // --- HANDOVER ON SUCCESS ---
+          // Check if agent did meaningful work but wants to hand over to another persona.
+          // We check this BEFORE the "no-work" safeguard because a handover report
+          // counts as meaningful work (especially for researchers/architects).
+          let didHandover = false;
+          try {
+            const { readFileSync } = require('node:fs');
+            const logContent = readFileSync(logPathForSession(sessionId), 'utf-8');
+
+            // Support: HANDOVER_CONTEXT:, ### Handover Context, **HANDOVER_CONTEXT:**
+            // Use global match and pick the last one to ignore the example in the prompt preamble.
+            const regex = /(?:###?\s*|\*\*?)?HANDOVER_CONTEXT[:\s*]*\n([\s\S]*?)(?:(?:\r?\n){2,}|```|$|#)/gi;
+            const matches = [...logContent.matchAll(regex)];
+            if (matches.length > 0) {
+              const lastMatch = matches[matches.length - 1]!;
+              const block = lastMatch[1]!;
+              let progress = block.match(/(?:progress:\s*|Progress:\s*)(.+)/)?.[1]?.trim() ?? '';
+              let nextSteps = block.match(/(?:next_steps:\s*|next steps:\s*|Next Steps:\s*)(.+)/)?.[1]?.trim() ?? '';
+              let blockers = block.match(/(?:blockers:\s*|Blockers:\s*)(.+)/)?.[1]?.trim() ?? '';
+
+              // Validate: if they just copied placeholders, try to fallback to PHASE_REPORT or generic summary
+              if (isMeaninglessHandover(progress) || isMeaninglessHandover(nextSteps)) {
+                const phaseReport = parsePhaseReport(logPathForSession(sessionId));
+                if (phaseReport.factsLearned.length > 0) {
+                  progress = `Completed phase: ${phaseReport.lastPhase}. Facts: ${phaseReport.factsLearned.join(', ')}`;
+                  nextSteps = 'Continue to next logical phase.';
+                } else if (!isMeaninglessHandover(progress)) {
+                   // Keep progress if it was actually meaningful
+                } else {
+                  progress = 'Agent did not provide meaningful progress summary.';
+                  nextSteps = 'Check logs for details.';
+                }
+              }
+
+              // Persist to top-level handover_context column and release item
+              bb.handoverWorkItem(itemId, sessionId, {
+                progress,
+                next_steps: nextSteps,
+                blockers,
+                previous_agent: sessionId,
+                handed_over_at: new Date().toISOString(),
+              });
+
+              // Also clear agent_persona override so next dispatch is a fresh bid
+              bb.updateWorkItemMetadata(itemId, {
+                agent_persona: null,
+              });
+
+              bb.appendEvent({
+                actorId: sessionId,
+                targetId: itemId,
+                summary: `Agent handed over task successfully (progress: ${progress.slice(0, 50)}${progress.length > 50 ? '...' : ''})`,
+                metadata: { handover: true, exitCode: 0 },
+              });
+
+              bb.releaseWorkItem(itemId, sessionId, {
+                reason: 'Agent requested handover to next persona on success',
+                actorId: personaName ?? sessionId,
+              });
+              
+              didHandover = true;
+            }
+          } catch { /* ignore parsing/fs errors */ }
+
+          if (didHandover) {
+            bb.deregisterAgent(sessionId);
+            return;
+          }
+
+          // No-work safeguard: if the agent used zero tools AND produced no handover,
+          // it likely did nothing meaningful (e.g. stalled or looped).
+          if (!hasToolUsage(sessionId)) {
+            bb.appendEvent({
+              actorId: sessionId,
+              targetId: itemId,
+              summary: `Agent exited 0 but used no tools for "${item.title}" — releasing as no-progress`,
+              metadata: { itemId, exitCode: 0, durationMs, noWorkDetected: true },
+            });
+            try {
+              bb.releaseWorkItem(itemId, sessionId, {
+                reason: 'Agent exited successfully but used no tools (no meaningful work)',
+                noProgress: true,
+                actorId: personaName ?? sessionId,
+              });
+            } catch { /* best effort */ }
+            bb.deregisterAgent(sessionId);
+            return;
+          }
+
           bb.completeWorkItem(itemId, sessionId);
 
           // Parse PHASE_REPORT from agent output and tag work item
@@ -843,23 +915,39 @@ export function registerDispatchWorkerCommand(
           try {
             const { readFileSync } = require('node:fs');
             const logContent = readFileSync(logPathForSession(sessionId), 'utf-8');
-            const handoverMatch = logContent.match(/HANDOVER_CONTEXT:\s*\n([\s\S]*?)(?:```|$)/);
-            if (handoverMatch) {
-              const block = handoverMatch[1]!;
-              const progress = block.match(/progress:\s*(.+)/)?.[1]?.trim() ?? '';
-              const nextSteps = block.match(/next_steps:\s*(.+)/)?.[1]?.trim() ?? '';
-              const blockers = block.match(/blockers:\s*(.+)/)?.[1]?.trim() ?? '';
+            const regex = /(?:###?\s*|\*\*?)?HANDOVER_CONTEXT[:\s*]*\n([\s\S]*?)(?:(?:\r?\n){2,}|```|$|#)/gi;
+            const matches = [...logContent.matchAll(regex)];
+            if (matches.length > 0) {
+              const lastMatch = matches[matches.length - 1]!;
+              const block = lastMatch[1]!;
+              let progress = block.match(/(?:progress:\s*|Progress:\s*)(.+)/)?.[1]?.trim() ?? '';
+              let nextSteps = block.match(/(?:next_steps:\s*|next steps:\s*|Next Steps:\s*)(.+)/)?.[1]?.trim() ?? '';
+              let blockers = block.match(/(?:blockers:\s*|Blockers:\s*)(.+)/)?.[1]?.trim() ?? '';
+
+              // Validate: if they just copied placeholders, try to fallback
+              if (isMeaninglessHandover(progress) || isMeaninglessHandover(nextSteps)) {
+                // For failures, it's harder to fallback to phase report since we might be in deep trouble,
+                // but let's try anyway.
+                const phaseReport = parsePhaseReport(logPathForSession(sessionId));
+                if (phaseReport.factsLearned.length > 0) {
+                  progress = `Failed during ${phaseReport.lastPhase}. Facts: ${phaseReport.factsLearned.join(', ')}`;
+                  nextSteps = 'Investigate failure in logs.';
+                } else if (!isMeaninglessHandover(progress)) {
+                  // Keep progress
+                } else {
+                  progress = 'Agent failed and provided no meaningful progress summary.';
+                  nextSteps = 'Check logs for details.';
+                }
+              }
 
               // Re-claim briefly to perform handover (item was just released)
               try {
-                bb.updateWorkItemMetadata(itemId, {
-                  handover_context: JSON.stringify({
-                    progress,
-                    next_steps: nextSteps,
-                    blockers,
-                    previous_agent: sessionId,
-                    handed_over_at: new Date().toISOString(),
-                  }),
+                bb.handoverWorkItem(itemId, sessionId, {
+                  progress,
+                  next_steps: nextSteps,
+                  blockers,
+                  previous_agent: sessionId,
+                  handed_over_at: new Date().toISOString(),
                 });
 
                 bb.appendEvent({
@@ -869,7 +957,7 @@ export function registerDispatchWorkerCommand(
                   metadata: { progress, next_steps: nextSteps, blockers },
                 });
               } catch {
-                // Non-fatal: metadata update failure
+                // Non-fatal: handover update failure
               }
             }
           } catch {
@@ -880,7 +968,7 @@ export function registerDispatchWorkerCommand(
         const msg = err instanceof Error ? err.message : String(err);
         const durationMs = Date.now() - startTime;
 
-        try { bb.releaseWorkItem(itemId, sessionId); } catch { /* best effort */ }
+        try { bb.releaseWorkItem(itemId, sessionId, { reason: msg, noProgress: true, actorId: personaName ?? sessionId }); } catch { /* best effort */ }
 
         bb.appendEvent({
           actorId: sessionId,

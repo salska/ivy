@@ -526,7 +526,7 @@ describe("releaseWorkItem", () => {
 
     const result = releaseWorkItem(db, "rel-1", agent.session_id);
     expect(result.item_id).toBe("rel-1");
-    expect(result.released).toBe(true);
+    expect(result.outcome === 'released' && result.released).toBe(true);
     expect(result.previous_status).toBe("claimed");
 
     const row = db.query("SELECT status, claimed_by, claimed_at FROM work_items WHERE item_id = ?").get("rel-1") as any;

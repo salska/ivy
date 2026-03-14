@@ -1,4 +1,4 @@
-export const CURRENT_SCHEMA_VERSION = 7;
+export const CURRENT_SCHEMA_VERSION = 8;
 
 export const PRAGMA_SQL = [
     "PRAGMA journal_mode = WAL;",
@@ -106,6 +106,17 @@ CREATE TABLE IF NOT EXISTS steering_rules (
     FOREIGN KEY (source_event) REFERENCES events(id)
 );
 
+CREATE TABLE IF NOT EXISTS semantic_cache (
+    cache_id      INTEGER PRIMARY KEY AUTOINCREMENT,
+    query_text    TEXT NOT NULL,
+    query_params  TEXT,
+    query_hash    TEXT NOT NULL UNIQUE,
+    response_json TEXT NOT NULL,
+    hits          INTEGER DEFAULT 0,
+    expires_at    TEXT NOT NULL,
+    created_at    TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS schema_version (
     version       INTEGER PRIMARY KEY,
     applied_at    TEXT NOT NULL,
@@ -133,6 +144,8 @@ CREATE INDEX IF NOT EXISTS idx_events_actor ON events(actor_id);
 
 CREATE INDEX IF NOT EXISTS idx_steering_rules_project ON steering_rules(project_id);
 CREATE INDEX IF NOT EXISTS idx_steering_rules_status ON steering_rules(status);
+
+CREATE INDEX IF NOT EXISTS idx_semantic_cache_hash ON semantic_cache(query_hash);
 `;
 
 export const SEED_VERSION_SQL = `
@@ -150,6 +163,8 @@ INSERT OR IGNORE INTO schema_version (version, applied_at, description)
 VALUES (6, datetime('now'), 'Add steering_rules table for learning loop');
 INSERT OR IGNORE INTO schema_version (version, applied_at, description)
 VALUES (7, datetime('now'), 'Add pending_approval status, handover_context, snapshots');
+INSERT OR IGNORE INTO schema_version (version, applied_at, description)
+VALUES (8, datetime('now'), 'Add semantic_cache table for query results');
 `;
 
 /**
@@ -295,9 +310,6 @@ CREATE INDEX IF NOT EXISTS idx_steering_rules_status ON steering_rules(status);
 /**
  * Migration SQL for v6 → v7: Add pending_approval status, handover/approval columns,
  * and snapshots table.
- *
- * - Recreates work_items with extended CHECK constraint + new columns
- * - Creates snapshots table for pre-dispatch state capture
  */
 export const MIGRATE_V7_SQL = `
 PRAGMA foreign_keys = OFF;
@@ -345,4 +357,22 @@ CREATE TABLE IF NOT EXISTS snapshots (
 );
 
 PRAGMA foreign_keys = ON;
+`;
+
+/**
+ * Migration SQL for v7 → v8: Add semantic_cache table.
+ */
+export const MIGRATE_V8_SQL = `
+CREATE TABLE IF NOT EXISTS semantic_cache (
+    cache_id      INTEGER PRIMARY KEY AUTOINCREMENT,
+    query_text    TEXT NOT NULL,
+    query_params  TEXT,
+    query_hash    TEXT NOT NULL UNIQUE,
+    response_json TEXT NOT NULL,
+    hits          INTEGER DEFAULT 0,
+    expires_at    TEXT NOT NULL,
+    created_at    TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_semantic_cache_hash ON semantic_cache(query_hash);
 `;

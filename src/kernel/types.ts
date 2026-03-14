@@ -13,6 +13,7 @@ export const WORK_ITEM_STATUSES = [
   "claimed",
   "completed",
   "blocked",
+  "failed",
   "waiting_for_response",
   "pending_approval",
 ] as const;

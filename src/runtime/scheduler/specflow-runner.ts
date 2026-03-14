@@ -117,6 +117,13 @@ export function resetWorktreeOps(): void {
 
 // ─── Main entry point ────────────────────────────────────────────────
 
+export class SpecFlowError extends Error {
+  constructor(message: string, public noProgress: boolean = false) {
+    super(message);
+    this.name = 'SpecFlowError';
+  }
+}
+
 /**
  * Run a single SpecFlow phase for a work item.
  *
@@ -135,7 +142,7 @@ export async function runSpecFlowPhase(
 ): Promise<boolean> {
   const meta = parseSpecFlowMeta(item.metadata);
   if (!meta) {
-    throw new Error('Work item has no valid SpecFlow metadata');
+    throw new SpecFlowError('Work item has no valid SpecFlow metadata', true);
   }
 
   let { specflow_feature_id: featureId } = meta;
@@ -209,7 +216,7 @@ export async function runSpecFlowPhase(
         summary: `specflow init failed (exit ${initResult.exitCode}) in worktree`,
         metadata: { stderr: initResult.stderr.slice(0, 500) },
       });
-      return false;
+      throw new SpecFlowError(`specflow init failed: ${initResult.stderr.slice(0, 500)}`, true);
     }
     bb.appendEvent({
       actorId: sessionId,
@@ -268,7 +275,7 @@ export async function runSpecFlowPhase(
           summary: `Failed to register feature ${featureId} in specflow (exit ${addResult.exitCode})`,
           metadata: { stderr: addResult.stderr.slice(0, 500) },
         });
-        return false;
+        throw new SpecFlowError(`Failed to register feature ${featureId}: ${addResult.stderr.slice(0, 500)}`, true);
       }
     }
   }
@@ -287,7 +294,7 @@ export async function runSpecFlowPhase(
       summary: `SpecFlow phase "${phase}" timed out for ${featureId}`,
       metadata: { phase, featureId, timeout: SPECFLOW_TIMEOUT_MS },
     });
-    return false;
+    throw new SpecFlowError(`SpecFlow phase "${phase}" timed out for ${featureId}`, true);
   }
 
   if (result.exitCode !== 0) {
@@ -331,7 +338,7 @@ export async function runSpecFlowPhase(
               summary: `SpecFlow complete still failed after artifact generation (exit ${retryResult.exitCode})`,
               metadata: { phase, exitCode: retryResult.exitCode, stderr: retryResult.stderr.slice(0, 500) },
             });
-            return false;
+            throw new SpecFlowError(`SpecFlow complete still failed after artifact generation for ${featureId}`, true);
           }
         } else {
           bb.appendEvent({
@@ -340,7 +347,7 @@ export async function runSpecFlowPhase(
             summary: `Failed to generate missing artifacts for ${featureId} — aborting complete`,
             metadata: { phase, missingArtifacts },
           });
-          return false;
+          throw new SpecFlowError(`Failed to generate missing artifacts for ${featureId}`, true);
         }
       } else {
         // Complete failed for a non-artifact reason
@@ -350,7 +357,7 @@ export async function runSpecFlowPhase(
           summary: `SpecFlow phase "${phase}" failed (exit ${result.exitCode}) for ${featureId}`,
           metadata: { phase, exitCode: result.exitCode, stderr: result.stderr.slice(0, 500) },
         });
-        return false;
+        throw new SpecFlowError(`SpecFlow phase "${phase}" failed (exit ${result.exitCode}) for ${featureId}`, true);
       }
     } else {
       bb.appendEvent({
@@ -359,7 +366,7 @@ export async function runSpecFlowPhase(
         summary: `SpecFlow phase "${phase}" failed (exit ${result.exitCode}) for ${featureId}`,
         metadata: { phase, exitCode: result.exitCode, stderr: result.stderr.slice(0, 500) },
       });
-      return false;
+      throw new SpecFlowError(`SpecFlow phase "${phase}" failed (exit ${result.exitCode}) for ${featureId}`, true);
     }
   }
 
@@ -394,7 +401,7 @@ export async function runSpecFlowPhase(
         summary: `Implementation agent failed (exit ${launchResult.exitCode}) for ${featureId}`,
         metadata: { exitCode: launchResult.exitCode },
       });
-      return false;
+      throw new SpecFlowError(`Implementation agent failed (exit ${launchResult.exitCode}) for ${featureId}`, false); // progress may have been made
     }
 
     bb.appendEvent({

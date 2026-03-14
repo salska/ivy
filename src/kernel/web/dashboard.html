@@ -685,40 +685,83 @@
     }
 
     .work-timeline-event {
-      padding: 4px 0;
-      font-size: 11px;
-      color: #8b949e;
       display: flex;
-      gap: 8px;
+      gap: 12px;
+      padding: 10px 14px;
+      border-radius: 8px;
+      margin-bottom: 8px;
+      background: #1c2128;
+      border: 1px solid #30363d;
+      font-size: 13px;
+      align-items: center;
+      transition: background 0.1s, border-color 0.1s;
+    }
+
+    .work-timeline-event:hover {
+      background: #21262d;
+      border-color: #444c56;
     }
 
     .work-timeline-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
+      width: 10px;
+      height: 10px;
+      border-radius: 4px;
       background: #30363d;
-      margin-top: 4px;
       flex-shrink: 0;
     }
 
     .work-timeline-dot.work_created {
-      background: #58a6ff;
+      background: #1f6feb;
+      box-shadow: 0 0 8px rgba(31, 111, 235, 0.4);
     }
 
     .work-timeline-dot.work_claimed {
-      background: #7ee787;
+      background: #d29922;
+      box-shadow: 0 0 8px rgba(210, 153, 34, 0.4);
     }
 
     .work-timeline-dot.work_completed {
-      background: #8b949e;
+      background: #238636;
+      box-shadow: 0 0 8px rgba(35, 134, 54, 0.4);
     }
 
-    .work-timeline-dot.work_released {
-      background: #d29922;
+    .work-timeline-dot.tool_use {
+      background: #d2a8ff;
+      border-radius: 50%;
+      opacity: 0.8;
     }
 
-    .work-timeline-dot.work_blocked {
+    .work-timeline-dot.heartbeat_received {
       background: #f85149;
+      border-radius: 50%;
+    }
+
+    .work-timeline-event .event-time {
+      color: #8b949e;
+      font-family: monospace;
+      font-size: 11px;
+      min-width: 60px;
+    }
+
+    .work-timeline-event .event-type {
+      text-transform: uppercase;
+      font-size: 10px;
+      font-weight: bold;
+      letter-spacing: 0.5px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: rgba(48, 54, 61, 0.5);
+      color: #8b949e;
+    }
+
+    .work-timeline-event .event-summary {
+      flex: 1;
+      color: #c9d1d9;
+    }
+
+    .activation-card {
+      border-left: 4px solid #f85149 !important;
+      background: rgba(248, 81, 73, 0.05) !important;
     }
 
     .work-agent-link {
@@ -833,6 +876,85 @@
       font-size: 10px;
       margin-left: 4px;
     }
+
+    /* Health Monitoring Styles */
+    .health-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .health-metric-card {
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 12px;
+      text-align: center;
+    }
+
+    .health-metric-label {
+      font-size: 10px;
+      color: #8b949e;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+    }
+
+    .health-metric-value {
+      font-size: 18px;
+      font-weight: 700;
+      color: #c9d1d9;
+    }
+
+    .health-metric-value.healthy { color: #7ee787; }
+    .health-metric-value.warning { color: #d29922; }
+    .health-metric-value.critical { color: #f85149; }
+
+    .health-score-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      border-right: 1px solid #21262d;
+    }
+
+    .health-score-circle {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      border: 6px solid #30363d;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      font-weight: 800;
+      margin-bottom: 8px;
+    }
+
+    .health-score-circle.healthy { border-color: #238636; color: #7ee787; }
+    .health-score-circle.warning { border-color: #9e6a03; color: #d29922; }
+    .health-score-circle.critical { border-color: #8e1519; color: #f85149; }
+
+    .health-activity-chart {
+      display: flex;
+      align-items: flex-end;
+      gap: 2px;
+      height: 60px;
+      padding: 10px 0;
+    }
+
+    .activity-bar {
+      flex: 1;
+      background: #21262d;
+      border-radius: 1px;
+      min-width: 4px;
+    }
+
+    .activity-bar.active {
+      background: #3fb950;
+    }
   </style>
 </head>
 
@@ -853,6 +975,19 @@
             id="work-stats">--</span></div>
         <div class="stat-row"><span class="stat-label">Events (24h)</span><span class="stat-value"
             id="event-count">--</span></div>
+      </div>
+    </div>
+
+    <div class="card" style="display: flex; padding: 0;">
+      <div class="health-score-container">
+        <div class="health-score-circle" id="health-score">--</div>
+        <div class="health-metric-label">Health Score</div>
+      </div>
+      <div style="flex: 1; padding: 16px;">
+        <h2>System Health</h2>
+        <div id="health-metrics-summary" class="health-grid" style="margin-bottom: 0;">
+          <span class="empty">Loading health data...</span>
+        </div>
       </div>
     </div>
   </div>
@@ -993,7 +1128,8 @@
     }
 
     function escapeHtml(str) {
-      return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      if (str === null || str === undefined) return '';
+      return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     }
 
     async function fetchStatus() {
@@ -1020,6 +1156,31 @@
         fetchFailures['status'] = (fetchFailures['status'] || 0) + 1;
         if (!sseConnected && fetchFailures['status'] >= FAILURE_THRESHOLD) {
           document.getElementById('agent-stats').textContent = 'Error';
+        }
+      }
+    }
+
+    async function fetchHealth() {
+      try {
+        const res = await fetch(API + '/api/health');
+        const data = await res.json();
+        fetchFailures['health'] = 0;
+
+        const scoreEl = document.getElementById('health-score');
+        scoreEl.textContent = data.overall_score;
+        scoreEl.className = 'health-score-circle ' + (data.overall_score > 85 ? 'healthy' : data.overall_score > 60 ? 'warning' : 'critical');
+
+        const metricsEl = document.getElementById('health-metrics-summary');
+        metricsEl.innerHTML = data.metrics.map(m => `
+          <div class="health-metric-card" title="${escapeHtml(m.description || '')}">
+            <div class="health-metric-label">${escapeHtml(m.label)}</div>
+            <div class="health-metric-value ${m.status}">${escapeHtml(m.value)}</div>
+          </div>
+        `).join('');
+      } catch (e) {
+        fetchFailures['health'] = (fetchFailures['health'] || 0) + 1;
+        if (!sseConnected && fetchFailures['health'] >= FAILURE_THRESHOLD) {
+          document.getElementById('health-metrics-summary').innerHTML = '<span class="empty">Error loading health metrics.</span>';
         }
       }
     }
@@ -1452,18 +1613,20 @@
         closeWorkDetail();
         return;
       }
-
       selectedWorkId = itemId;
       document.getElementById('work-detail-panel').classList.add('visible');
       document.getElementById('work-detail-title').textContent = 'Loading...';
       document.getElementById('work-detail-body').innerHTML = '<span class="empty">Loading...</span>';
-
-      // Re-render to show selection
       renderWorkItems();
+      await loadWorkDetail(itemId);
+    }
 
+    async function loadWorkDetail(itemId) {
+      if (selectedWorkId !== itemId) return;
       try {
         const res = await fetch(API + '/api/work/' + encodeURIComponent(itemId));
         const data = await res.json();
+        if (selectedWorkId !== itemId) return;
 
         if (!data.ok) {
           document.getElementById('work-detail-body').innerHTML = '<span class="empty">Work item not found.</span>';
@@ -1475,84 +1638,52 @@
 
         let html = '';
 
-        // Meta info row
+        // ─── 1. Core Metadata & Agent Info ──────────────────────────
         html += '<div class="work-detail-meta">';
         html += '<div class="work-meta-item"><span class="work-meta-label">ID:</span><span class="work-meta-value">' + escapeHtml(item.item_id) + '</span></div>';
         html += '<div class="work-meta-item"><span class="work-meta-label">Status:</span>' + badge(item.status) + '</div>';
         html += '<div class="work-meta-item"><span class="work-meta-label">Priority:</span><span class="work-meta-value">' + item.priority + '</span></div>';
-        html += '<div class="work-meta-item"><span class="work-meta-label">Source:</span><span class="work-meta-value">' + (item.source || '--') + '</span></div>';
-        if (item.source_ref) {
-          html += '<div class="work-meta-item"><span class="work-meta-label">Ref:</span><span class="work-meta-value">' + escapeHtml(item.source_ref) + '</span></div>';
-        }
         if (item.project_id) {
           html += '<div class="work-meta-item"><span class="work-meta-label">Project:</span><span class="work-meta-value">' + escapeHtml(item.project_id) + '</span></div>';
         }
-        html += '</div>';
-
-        // Agent info with link
         if (item.claimed_by) {
           const agentName = data.agent_name || item.claimed_by.slice(0, 12);
-          html += '<div class="work-detail-meta">';
           html += '<div class="work-meta-item"><span class="work-meta-label">' + (item.status === 'completed' ? 'Completed By:' : 'Claimed By:') + '</span>';
-          html += '<span class="work-agent-link" onclick="navigateToAgent(\'' + escapeHtml(item.claimed_by) + '\')">' + escapeHtml(agentName) + '</span>';
-          html += ' <span style="color:#484f58;font-size:10px">(' + truncate(item.claimed_by, 12) + ')</span></div>';
-          if (item.claimed_at) {
-            html += '<div class="work-meta-item"><span class="work-meta-label">Claimed:</span><span class="work-meta-value">' + relTime(item.claimed_at) + '</span></div>';
-          }
+          html += '<span class="work-agent-link" onclick="navigateToAgent(\'' + escapeHtml(item.claimed_by) + '\')">' + escapeHtml(agentName) + '</span></div>';
           if (item.completed_at) {
             const duration = formatDuration(new Date(item.completed_at).getTime() - new Date(item.created_at).getTime());
-            html += '<div class="work-meta-item"><span class="work-meta-label">Completed:</span><span class="work-meta-value">' + relTime(item.completed_at) + '</span><span class="duration-badge">' + duration + '</span></div>';
+            html += '<div class="work-meta-item"><span class="work-meta-label">Duration:</span><span class="work-meta-value">' + duration + '</span></div>';
+          }
+        }
+        html += '</div>';
+
+        if (item.description) {
+          html += '<div class="work-detail-section-title">Description</div>';
+          html += '<div class="work-detail-description">' + escapeHtml(item.description) + '</div>';
+        }
+
+        // ─── 2. Capacity Details (Persona & Skills) ──────────────────
+        if (data.persona_detail || (data.skills_detail && data.skills_detail.length > 0)) {
+          html += '<div class="work-detail-section-title">Configuration</div>';
+          html += '<div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px;">';
+          if (data.persona_detail) {
+            const p = data.persona_detail;
+            html += `<div class="persona-card" style="border-left: 3px solid #58a6ff; background: #1c2128; margin: 0;">
+               <div class="persona-card-name">${escapeHtml(p.name)}</div>
+               <div class="persona-card-desc" style="font-size: 11px;">${escapeHtml(p.description)}</div>
+             </div>`;
+          }
+          if (data.skills_detail && data.skills_detail.length > 0) {
+            html += '<div style="display: flex; flex-wrap: wrap; gap: 6px;">';
+            for (const s of data.skills_detail) {
+              html += `<span class="badge" style="background: #23863622; color: #7ee787; border: 1px solid #23863644; font-size: 10px;">${escapeHtml(s.name)}</span>`;
+            }
+            html += '</div>';
           }
           html += '</div>';
         }
 
-        if (data.persona_detail) {
-          html += '<div class="work-detail-section-title">Assigned Persona</div>';
-          html += '<div style="background:#0d1117; padding:12px; border-radius:6px; border:1px solid #30363d; margin-bottom:16px;">';
-          html += '<div style="color:#58a6ff; font-weight:bold; margin-bottom:4px;">' + escapeHtml(data.persona_detail.name) + ' <span style="color:#8b949e; font-weight:normal; font-size:11px;">(' + escapeHtml(data.persona_detail.identity) + ')</span></div>';
-          html += '<div style="font-size:12px; color:#c9d1d9;">' + escapeHtml(data.persona_detail.description) + '</div>';
-          html += '</div>';
-        }
-
-        if (data.skills_detail && data.skills_detail.length > 0) {
-          html += '<div class="work-detail-section-title">Applied Skills</div>';
-          html += '<div style="background:#0d1117; padding:12px; border-radius:6px; border:1px solid #30363d; margin-bottom:16px; display:flex; flex-direction:column; gap:8px;">';
-          data.skills_detail.forEach(skill => {
-            html += '<div>';
-            html += '<div style="color:#7ee787; font-weight:bold; font-size:12px; margin-bottom:2px;">' + escapeHtml(skill.name) + '</div>';
-            html += '<div style="font-size:11px; color:#8b949e;">' + escapeHtml(skill.description) + '</div>';
-            html += '</div>';
-          });
-          html += '</div>';
-        }
-
-        if (item.metadata) {
-          try {
-            const meta = JSON.parse(item.metadata);
-            if (meta.PHASE_REPORT) {
-              html += '<div class="work-detail-section-title">Agent Outcome</div>';
-              html += '<div style="background:#161b22; padding:12px; border-radius:6px; border:1px solid #30363d; margin-bottom:16px; font-size:12px;">';
-              html += '<div style="margin-bottom:8px;"><span style="color:#8b949e">Final Phase:</span> <span style="color:#58a6ff; font-weight:bold;">' + escapeHtml(meta.PHASE_REPORT.phase) + '</span></div>';
-              if (meta.PHASE_REPORT.facts_learned && meta.PHASE_REPORT.facts_learned.length > 0) {
-                html += '<div style="color:#8b949e; margin-bottom:4px;">Facts Learned:</div><ul style="margin-left:20px; color:#c9d1d9;">';
-                meta.PHASE_REPORT.facts_learned.forEach(f => {
-                  html += '<li style="margin-bottom:2px;">' + escapeHtml(f) + '</li>';
-                });
-                html += '</ul>';
-              }
-              if (meta.PHASE_REPORT.tasks_completed && meta.PHASE_REPORT.tasks_completed.length > 0) {
-                html += '<div style="color:#8b949e; margin:8px 0 4px 0;">Tasks Completed:</div><ul style="margin-left:20px; color:#c9d1d9;">';
-                meta.PHASE_REPORT.tasks_completed.forEach(t => {
-                  html += '<li style="margin-bottom:2px;">' + escapeHtml(t) + '</li>';
-                });
-                html += '</ul>';
-              }
-              html += '</div>';
-            }
-          } catch (e) { }
-        }
-
-        // Approval panel for pending_approval items
+        // ─── 3. Actionable Panels (Approval & Handover) ──────────────
         if (item.status === 'pending_approval') {
           html += '<div style="background:#3d2c00; border:1px solid #d29922; border-radius:6px; padding:16px; margin-bottom:16px;">';
           html += '<div style="color:#d29922; font-weight:bold; font-size:13px; margin-bottom:8px;">⚠️ Approval Required</div>';
@@ -1562,7 +1693,6 @@
               html += '<div style="color:#c9d1d9; font-size:12px; margin-bottom:12px;">';
               if (req.action) html += '<div><strong>Action:</strong> ' + escapeHtml(req.action) + '</div>';
               if (req.reason) html += '<div><strong>Reason:</strong> ' + escapeHtml(req.reason) + '</div>';
-              if (req.risk) html += '<div><strong>Risk:</strong> ' + escapeHtml(req.risk) + '</div>';
               html += '</div>';
             } catch { }
           }
@@ -1572,7 +1702,6 @@
           html += '</div></div>';
         }
 
-        // Handover context display
         if (item.handover_context) {
           html += '<div class="work-detail-section-title">Handover Context</div>';
           html += '<div style="background:#0d1117; padding:12px; border-radius:6px; border:1px solid #30363d; margin-bottom:16px; font-size:12px;">';
@@ -1580,82 +1709,95 @@
             const hctx = JSON.parse(item.handover_context);
             if (hctx.progress) html += '<div style="margin-bottom:6px;"><span style="color:#8b949e;">Progress:</span> <span style="color:#7ee787;">' + escapeHtml(hctx.progress) + '</span></div>';
             if (hctx.next_steps) html += '<div style="margin-bottom:6px;"><span style="color:#8b949e;">Next Steps:</span> <span style="color:#58a6ff;">' + escapeHtml(hctx.next_steps) + '</span></div>';
-            if (hctx.blockers) html += '<div style="margin-bottom:6px;"><span style="color:#8b949e;">Blockers:</span> <span style="color:#f85149;">' + escapeHtml(hctx.blockers) + '</span></div>';
-            if (hctx.previous_agent) html += '<div><span style="color:#8b949e;">Previous Agent:</span> <span style="color:#d2a8ff;">' + truncate(hctx.previous_agent, 12) + '</span></div>';
+            if (hctx.previous_agent) html += '<div><span style="color:#8b949e;">From Agent:</span> <span style="color:#d2a8ff;">' + truncate(hctx.previous_agent, 12) + '</span></div>';
           } catch {
             html += '<div style="color:#c9d1d9;">' + escapeHtml(item.handover_context) + '</div>';
           }
           html += '</div>';
         }
 
-        // Description
-        if (item.description) {
-          html += '<div class="work-detail-section-title">Description</div>';
-          html += '<div class="work-detail-description">' + escapeHtml(item.description) + '</div>';
+        // ─── 4. Timeline Enrichment ──────────────────────────────────
+        let history = data.history || [];
+
+        if (item.claimed_by) {
+          try {
+            const logRes = await fetch(API + '/api/agents/' + encodeURIComponent(item.claimed_by) + '/log');
+            if (logRes.ok) {
+              const logText = await logRes.text();
+              const logLines = logText.split('\n');
+
+              const stripAnsi = (str) => str.replace(/\x1B\[[0-9;]*[a-zA-Z]/g, '');
+              const toolRegex = /^(?:\[tool\]|▶)\s+(.+)$/;
+
+              const claimEvent = history.find(e => e.event_type === 'work_claimed');
+              let baseTime = claimEvent ? new Date(claimEvent.timestamp).getTime() : Date.now() - 3600000;
+              let offset = 0;
+
+              for (const rawLine of logLines) {
+                const line = stripAnsi(rawLine).trim();
+                const match = line.match(toolRegex);
+                if (match) {
+                  history.push({
+                    event_type: 'tool_use',
+                    timestamp: new Date(baseTime + (++offset) * 1000).toISOString(),
+                    summary: match[1].trim()
+                  });
+                }
+              }
+              history.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+            }
+          } catch (e) {
+            console.error("Timeline enrichment failed:", e);
+          }
         }
 
-        // Timeline
-        const history = data.history || [];
+        // ─── 4. Render Timeline ──────────────────────────────────────
         if (history.length > 0) {
           html += '<div class="work-detail-section-title">Timeline</div>';
           for (const ev of history) {
-            html += '<div class="work-timeline-event">';
-            html += '<span class="work-timeline-dot ' + escapeHtml(ev.event_type) + '"></span>';
-            html += '<span style="color:#484f58;min-width:50px">' + relTime(ev.timestamp) + '</span>';
-            html += '<span class="event-type">' + escapeHtml(ev.event_type) + '</span>';
-            html += '<span class="event-summary">' + escapeHtml(ev.summary) + '</span>';
+            if (selectedWorkId !== itemId) return;
+            const isActivation = ev.event_type === 'heartbeat_received' || ev.event_type === 'work_claimed';
+            const cardClass = isActivation ? 'activation-card' : '';
+
+            html += `<div class="work-timeline-event ${cardClass}">`;
+            html += `<span class="work-timeline-dot ${escapeHtml(ev.event_type)}"></span>`;
+            html += `<span class="event-time">${relTime(ev.timestamp)}</span>`;
+            html += `<span class="event-type">${escapeHtml(ev.event_type)}</span>`;
+            html += `<span class="event-summary">${escapeHtml(ev.summary)}</span>`;
             html += '</div>';
           }
         }
 
-        // Persona Detail
-        if (data.persona_detail) {
-          const p = data.persona_detail;
-          html += '<div class="work-detail-section-title">Assigned Persona</div>';
-          html += `<div class="persona-card" style="border-left: 3px solid #58a6ff; margin-bottom: 12px; background: #1c2128">
-            <div class="persona-card-header">
-              <div class="persona-card-name">${escapeHtml(p.name)}</div>
-            </div>
-            <div class="persona-card-desc">${escapeHtml(p.description)}</div>
-          </div>`;
-        }
-
-        // Skills Detail
-        if (data.skills_detail && data.skills_detail.length > 0) {
-          html += '<div class="work-detail-section-title">Applied Skills</div>';
-          html += '<div class="persona-grid" style="grid-template-columns: 1fr; gap: 8px;">';
-          for (const s of data.skills_detail) {
-            html += `<div class="persona-card" style="border-left: 3px solid #39d0d8; background: #1c2128; padding: 8px 12px;">
-              <div class="persona-card-name" style="font-size: 11px;">${escapeHtml(s.name)}</div>
-              <div class="persona-card-desc" style="font-size: 10px;">${escapeHtml(s.description)}</div>
-            </div>`;
-          }
-          html += '</div>';
-        }
-
-        // Metadata / Phase Report
+        // ─── 5. Outcome & Metadata ───────────────────────────────────
         if (item.metadata) {
           try {
             const meta = JSON.parse(item.metadata);
-
-            // Highlight KAI/Phase context
-            if (meta.kai_phase) {
-              html += '<div class="work-detail-section-title">Agent Outcome</div>';
-              html += `<div class="card" style="background: #1c2128; border-color: #30363d; margin-bottom: 12px;">
-                <div class="stat-row"><span class="stat-label">Last Phase</span><span class="stat-value" style="color: #d2a8ff">${escapeHtml(meta.kai_phase)}</span></div>
-                <div class="stat-row"><span class="stat-label">Completed</span><span class="stat-value">${meta.kai_completed ? '✅ Yes' : '❌ No'}</span></div>
-                <div class="stat-row"><span class="stat-label">ISC Met</span><span class="stat-value">${escapeHtml(meta.kai_isc_met || 'unknown')}</span></div>
-              </div>`;
+            if (meta.kai_phase || meta.PHASE_REPORT) {
+              html += '<div class="work-detail-section-title">Outcome</div>';
+              html += '<div class="card" style="background: #1c2128; border-color: #30363d; margin-bottom: 12px; font-size: 12px;">';
+              if (meta.kai_phase) {
+                html += `<div class="stat-row"><span class="stat-label">Last Phase</span><span class="stat-value" style="color: #d2a8ff">${escapeHtml(meta.kai_phase)}</span></div>`;
+                html += `<div class="stat-row"><span class="stat-label">Status</span><span class="stat-value">${meta.kai_completed ? '✅ Completed' : '🔄 In Progress'}</span></div>`;
+              }
+              if (meta.PHASE_REPORT && meta.PHASE_REPORT.facts_learned) {
+                html += '<div style="margin-top: 8px; color: #8b949e;">Key Learnings:</div>';
+                html += '<ul style="margin: 4px 0 0 16px; color: #c9d1d9;">';
+                meta.PHASE_REPORT.facts_learned.slice(0, 5).forEach(f => html += `<li>${escapeHtml(f)}</li>`);
+                html += '</ul>';
+              }
+              html += '</div>';
             }
-
-            html += '<div class="work-detail-section-title">Raw Metadata</div>';
-            html += '<div class="work-detail-metadata">' + escapeHtml(JSON.stringify(meta, null, 2)) + '</div>';
-          } catch { }
+          } catch (e) { }
         }
 
-        document.getElementById('work-detail-body').innerHTML = html;
+        if (selectedWorkId === itemId) {
+          document.getElementById('work-detail-body').innerHTML = html;
+        }
       } catch (e) {
-        document.getElementById('work-detail-body').innerHTML = '<span class="empty">Error loading work item detail.</span>';
+        console.error("loadWorkDetail failed:", e);
+        if (selectedWorkId === itemId) {
+          document.getElementById('work-detail-body').innerHTML = '<span class="empty">Error loading work item detail.</span>';
+        }
       }
     }
 
@@ -1797,6 +1939,7 @@
               ${totalWork === 0 && p.active_agents === 0 ? '<span class="stat" style="color:#484f58">no activity</span>' : ''}
             </div>
             <div class="project-card-meta">
+              ${p.local_path ? `<div class="truncate" style="color:#8b949e;margin-bottom:4px;font-size:10px" title="${escapeHtml(p.local_path)}">${escapeHtml(p.local_path)}</div>` : ''}
               ${p.remote_repo ? `<a href="${escapeHtml(p.remote_repo)}" target="_blank" onclick="event.stopPropagation()">repo</a> · ` : ''}
               ${lastAct !== 'never' ? lastAct : 'registered ' + relTime(p.registered_at)}
             </div>
@@ -2030,7 +2173,13 @@
     }
 
     async function refresh() {
-      await Promise.all([fetchStatus(), fetchProjects(), fetchAgents(), fetchWork(), fetchEvents()]);
+      await Promise.all([fetchStatus(), fetchHealth(), fetchProjects(), fetchAgents(), fetchWork(), fetchEvents()]);
+      if (selectedWorkId) {
+        const item = currentWorkItems.find(w => w.item_id === selectedWorkId);
+        if (item && item.status !== 'completed') {
+          await loadWorkDetail(selectedWorkId);
+        }
+      }
       document.getElementById('last-update').textContent = new Date().toLocaleTimeString();
     }
 

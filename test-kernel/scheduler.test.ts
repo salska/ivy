@@ -1,10 +1,12 @@
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
+import { mkdirSync, rmSync } from 'node:fs';
 import { createTestContext, cleanupTestContext, type TestContext } from './helpers.ts';
 import { dispatch } from '../src/runtime/scheduler/scheduler.ts';
 import { setLauncher, resetLauncher } from '../src/runtime/scheduler/launcher.ts';
 import { registerProject } from '../src/kernel/project';
 import { createWorkItem } from '../src/kernel/work';
 import type { LaunchOptions, LaunchResult, DispatchOptions } from '../src/runtime/scheduler/types.ts';
+import { updateWorkItemMetadata } from '../src/kernel/work';
 
 let ctx: TestContext;
 let launchCalls: LaunchOptions[];
@@ -27,6 +29,7 @@ function defaultOpts(overrides: Partial<DispatchOptions> = {}): DispatchOptions 
 }
 
 function seedProject(id: string, path: string): void {
+  mkdirSync(path, { recursive: true });
   registerProject(ctx.bb.db, { id, name: id, path });
 }
 
@@ -43,6 +46,9 @@ beforeEach(() => {
 afterEach(() => {
   resetLauncher();
   cleanupTestContext(ctx);
+  // Optional: cleanup the paths created
+  try { rmSync('/tmp/proj-a', { recursive: true, force: true }); } catch { }
+  try { rmSync('/tmp/proj-b', { recursive: true, force: true }); } catch { }
 });
 
 describe('dispatch', () => {
@@ -286,5 +292,23 @@ describe('dispatch', () => {
     const r2 = await dispatch(ctx.bb, defaultOpts());
     expect(r2.dispatched).toHaveLength(0);
     expect(r2.skipped).toHaveLength(0);
+  });
+
+  test('rotates to different persona when failed_by contains previous persona', async () => {
+    seedProject('proj-a', '/tmp/proj-a');
+    seedWorkItem('task-stale', 'proj-a', 'P1');
+
+    // Simulate prior stagnation: persona "Architect" already failed this item.
+    updateWorkItemMetadata(ctx.bb.db, 'task-stale', {
+      failed_by: ['Architect'],
+      stagnation_count: 1,
+    });
+
+    const result = await dispatch(ctx.bb, defaultOpts());
+
+    // Should dispatch with a rotated persona (not Architect), not skip
+    expect(result.dispatched).toHaveLength(1);
+    expect(result.skipped).toHaveLength(0);
+    expect(launchCalls).toHaveLength(1);
   });
 });

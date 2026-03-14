@@ -1,0 +1,94 @@
+# project-a registers its upcoming features
+bun run dev work create --id "project-a-cache" \
+  --title "Add semantic cache layer to database queries" \
+  --project "proj" --priority "P2" --source "local" --source-ref "./projects/proj"
+
+bun run dev work create --id "project-a-monitoring" \
+  --title "Health monitoring dashboard" \
+  --project "proj" --priority "P3" --source "local" --source-ref "./projects/proj"
+
+bun run dev work create --id "project-b-user-mgmt" \
+  --title "User management with role-based access" \
+  --project "project-alpha" --priority "P1" --source "local" --source-ref "./projects/alpha"
+
+bun run dev work create --id "project-b-audit-log" \
+  --title "Security audit logging for compliance" \
+  --project "project-alpha" --priority "P2" --source "local" --source-ref "./projects/alpha"
+
+Here are a few simple use cases designed to test agent handovers. Each use case is structured so that completing the goal naturally demands different specialized skills (e.g., planning, backend, frontend, qa, tech writing), forcing the blackboard to hand the task over to the most suitable agent at each stage.
+
+Use Case 1: Full-Stack Feature Implementation (Auth Flow)
+This tests the classic handover from Planning/Design -> Backend -> Frontend -> QA.
+
+bash
+# 1. Spec & Planning (Architect / Tech Writer Agent picks this up)
+bun run dev work create --id "auth-spec" \
+  --title "Draft OpenAPI specification for new JWT auth endpoints" \
+  --project "proj" --priority "P1" --source "local" --source-ref "./projects/proj" \
+  --skills "architect,planning"
+# 2. Backend Implementation (Backend / Node Agent picks this up once spec exists)
+bun run dev work create --id "auth-backend" \
+  --title "Implement JWT authentication API based on OpenAPI spec" \
+  --project "proj" --priority "P1" --source "local" --source-ref "./projects/proj" \
+  --skills "backend,nodejs"
+# 3. Frontend Integration (Frontend / UI Agent picks this up once API is ready)
+bun run dev work create --id "auth-frontend" \
+  --title "Integrate JWT auth into React login page" \
+  --project "proj" --priority "P2" --source "local" --source-ref "./projects/proj" \
+  --skills "frontend,react"
+# 4. End-to-End Testing (QA / Testing Agent picks this up once UI is ready)
+bun run dev work create --id "auth-qa" \
+  --title "Write Cypress E2E tests for the new JWT login flow" \
+  --project "proj" --priority "P2" --source "local" --source-ref "./projects/proj" \
+  --skills "qa,testing"
+
+Use Case 2: Bug Fix & Documentation Updates
+This tests a shorter cycle where an engineer fixes a bug, and then a documentation specialist updates the public docs.
+
+bash
+# 1. Code Fix (Bugfix / Backend Agent picks this up)
+bun run dev work create --id "bugfix-cache-invalidation" \
+  --title "Fix stale cache invalidation bug in user service" \
+  --project "proj" --priority "P1" --source "local" --source-ref "./projects/proj" \
+  --skills "backend,debugging"
+# 2. Documentation Update (Tech Writer Agent picks this up to document the new behavior)
+bun run dev work create --id "docs-cache-behavior" \
+  --title "Update developer portal docs to reflect explicit cache invalidation logic" \
+  --project "proj" --priority "P2" --source "local" --source-ref "./projects/proj" \
+  --skills "technical-writing,docs"
+
+Use Case 3: Data Pipeline (Database -> Script -> Dashboard)
+This tests handover across data roles: Database Admin -> Data Engineer -> Data Analyst/BI Builder.
+
+bash
+# 1. Database Schema Changes (Database / DBA Agent picks this up)
+bun run dev work create --id "data-schema-metrics" \
+  --title "Create structured tables for storing daily user engagement metrics" \
+  --project "proj" --priority "P2" --source "local" --source-ref "./projects/proj" \
+  --skills "database,sql"
+# 2. Data Migration/Pipeline (Data Engineer Agent picks this up)
+bun run dev work create --id "data-pipeline-metrics" \
+  --title "Write a daily cron script to aggregate and insert engagement metrics" \
+  --project "proj" --priority "P2" --source "local" --source-ref "./projects/proj" \
+  --skills "data-engineering,python"
+# 3. Dashboard Analytics (Data Analyst Agent picks this up)
+bun run dev work create --id "data-dashboard-metrics" \
+  --title "Construct Grafana dashboard to visualize new engagement metrics" \
+  --project "proj" --priority "P3" --source "local" --source-ref "./projects/proj" \
+  --skills "analytics,data-visualization"
+
+How to use: You can append these commands directly to your running script or 
+
+tasks
+ file. By intentionally differentiating the required --skills string on the tasks above, your blackboard loop will trigger a search for the best agent profile available for that segment of work, explicitly demonstrating the handover from one specialist to another.
+
+  bun run dev work create --id task-004 \
+    --title "Review the news updates today on the big events of the middle east war" \
+    --description "Provide a concise overview from reputable trusted and impartial sources."
+
+  bun run dev work create --id task-005 \
+    --title "Middle East War Research Report" \
+    --description "Use your research tools to find today's news and SAVE the
+     result to a file named 'middle-east-report.md' using the Write tool. Do not
+     just output text." \
+    --skills "Fabric, Research"

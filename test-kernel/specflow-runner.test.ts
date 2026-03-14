@@ -376,12 +376,12 @@ describe('specflow-runner', () => {
 
       ctx.bb.registerAgent({ name: 'test', project: 'test-proj', work: item.item_id });
 
-      await runSpecFlowPhase(
+      await expect(runSpecFlowPhase(
         ctx.bb,
         item,
         { project_id: 'test-proj', local_path: '/tmp/test-project' },
         'test-session'
-      );
+      )).rejects.toThrow();
 
       // No chained items
       const items = ctx.bb.listWorkItems({ all: true });
@@ -400,12 +400,12 @@ describe('specflow-runner', () => {
 
       ctx.bb.registerAgent({ name: 'test', project: 'test-proj', work: item.item_id });
 
-      await runSpecFlowPhase(
+      await expect(runSpecFlowPhase(
         ctx.bb,
         item,
         { project_id: 'test-proj', local_path: '/tmp/test-project' },
         'test-session'
-      );
+      )).rejects.toThrow();
 
       // No chained items
       const items = ctx.bb.listWorkItems({ all: true });
@@ -526,14 +526,12 @@ describe('specflow-runner', () => {
 
       ctx.bb.registerAgent({ name: 'test', project: 'test-proj', work: item.item_id });
 
-      const result = await runSpecFlowPhase(
+      await expect(runSpecFlowPhase(
         ctx.bb,
         item,
         { project_id: 'test-proj', local_path: '/tmp/test-project' },
         'test-session'
-      );
-
-      expect(result).toBe(false);
+      )).rejects.toThrow();
     });
 
     test('returns false when retry fails after artifact generation', async () => {
@@ -564,15 +562,12 @@ describe('specflow-runner', () => {
 
       ctx.bb.registerAgent({ name: 'test', project: 'test-proj', work: item.item_id });
 
-      const result = await runSpecFlowPhase(
+      await expect(runSpecFlowPhase(
         ctx.bb,
         item,
         { project_id: 'test-proj', local_path: '/tmp/test-project' },
         'test-session'
-      );
-
-      // Should fail because retry also fails
-      expect(result).toBe(false);
+      )).rejects.toThrow();
     });
 
     test('returns false when complete fails for non-artifact reason', async () => {
@@ -593,15 +588,12 @@ describe('specflow-runner', () => {
 
       ctx.bb.registerAgent({ name: 'test', project: 'test-proj', work: item.item_id });
 
-      const result = await runSpecFlowPhase(
+      await expect(runSpecFlowPhase(
         ctx.bb,
         item,
         { project_id: 'test-proj', local_path: '/tmp/test-project' },
         'test-session'
-      );
-
-      // Should fail — no artifact generation attempted
-      expect(result).toBe(false);
+      )).rejects.toThrow();
     });
   });
 
