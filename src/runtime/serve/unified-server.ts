@@ -3,6 +3,7 @@ import { generateDashboardHTML as generateHeartbeatHTML } from './dashboard.ts';
 import { generateSummary } from '../observe/summary.ts';
 import { getSpecFlowPipelines } from './api/specflow-pipeline.ts';
 import { renderSpecFlowPanel } from './views/specflow-panel.ts';
+import { renderMonitoringPanel } from './views/monitoring-panel.ts';
 import { listSkills, buildSkillContext } from '../skills.ts';
 import { loadPersona } from '../scheduler/persona-loader.ts';
 
@@ -129,12 +130,14 @@ function generateTabbedShell(): string {
     <button class="tab-btn active" onclick="switchTab('blackboard')" id="tab-blackboard">Blackboard</button>
     <button class="tab-btn" onclick="switchTab('heartbeat')" id="tab-heartbeat">Heartbeat</button>
     <button class="tab-btn" onclick="switchTab('specflow')" id="tab-specflow">SpecFlow</button>
+    <button class="tab-btn" onclick="switchTab('monitoring')" id="tab-monitoring">Monitoring</button>
     <div style="flex-grow: 1;"></div>
     <button onclick="flushAllDatabase()" style="background-color: transparent; color: #ff7b72; border: 1px solid #da3633; padding: 4px 10px; border-radius: 4px; font-size: 11px; font-weight: bold; cursor: pointer; text-transform: uppercase; margin-bottom: 6px; box-shadow: 0 0 4px rgba(218, 54, 51, 0.4); align-self: center;">☢️ Nuclear Flush</button>
   </div>
   <iframe id="frame-blackboard" class="tab-content active" src="/dashboard/blackboard"></iframe>
   <iframe id="frame-heartbeat" class="tab-content" src="/dashboard/heartbeat"></iframe>
   <iframe id="frame-specflow" class="tab-content" src="/dashboard/specflow"></iframe>
+  <iframe id="frame-monitoring" class="tab-content" src="/dashboard/monitoring"></iframe>
 <script>
 function switchTab(name) {
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -230,6 +233,14 @@ export function startUnifiedServer(
                     );
                 }
 
+                if (path === '/dashboard/monitoring') {
+                    const html = renderMonitoringPanel();
+                    return new Response(
+                        `<!DOCTYPE html><html><head><meta charset="utf-8"><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:monospace;background:#0d1117;color:#c9d1d9;padding:0;font-size:13px}</style></head><body>${html}</body></html>`,
+                        { headers: { 'Content-Type': 'text/html', ...cors } },
+                    );
+                }
+
                 // ═══ Heartbeat API routes ════════════════════════════════════
 
                 if (path === '/api/events' && !url.searchParams.has('filter')) {
@@ -296,6 +307,37 @@ export function startUnifiedServer(
                     const pipelines = getSpecFlowPipelines(bb);
                     const html = renderSpecFlowPanel(pipelines);
                     return new Response(html, { headers: { ...cors, 'Content-Type': 'text/html' } });
+                }
+
+                if (path === '/api/metrics/monitoring') {
+                    // Aggregate stats from semantic_cache table
+                    const cacheStats = db.query('SELECT SUM(hits) as total_hits, COUNT(*) as entry_count FROM semantic_cache').get() as { total_hits: number | null, entry_count: number };
+                    
+                    // Mock additional monitoring data for visualization
+                    // In a production system, these would come from Prometheus or an OTel aggregator
+                    const hits = cacheStats.total_hits ?? 0;
+                    const misses = Math.floor(hits * 0.15) + 5; // Simulating some misses
+                    
+                    const similarityBuckets = [
+                        Math.floor(Math.random() * 5),
+                        Math.floor(Math.random() * 8),
+                        Math.floor(Math.random() * 12),
+                        Math.floor(Math.random() * 20),
+                        Math.floor(Math.random() * 15),
+                        Math.floor(Math.random() * 10),
+                        Math.floor(Math.random() * 5)
+                    ];
+
+                    const data = {
+                        hits,
+                        misses,
+                        entryCount: cacheStats.entry_count,
+                        currentLatency: 45 + Math.floor(Math.random() * 20),
+                        similarityBuckets,
+                        throughput: (hits + misses) / 60 // Simple avg
+                    };
+                    
+                    return jsonOk(data, 200, cors);
                 }
 
                 // ═══ Blackboard API routes ═══════════════════════════════════

@@ -19,6 +19,43 @@ export function logPathForSession(sessionId: string): string {
 }
 
 /**
+ * Retrieve the tail of the log file for the most recent crashed/abandoned agent
+ * that was working on this item. Useful for prompt context recovery.
+ */
+export function getPreviousAgentLogs(db: import('bun:sqlite').Database, itemId: string, currentSessionId: string): string | null {
+  try {
+    const row = db.query(`
+      SELECT actor_id as session_id
+      FROM events
+      WHERE event_type = 'work_claimed' AND target_id = ? AND actor_id != ?
+      ORDER BY timestamp DESC
+      LIMIT 1
+    `).get(itemId, currentSessionId) as { session_id: string } | null;
+
+    if (!row) return null;
+
+    const logPath = logPathForSession(row.session_id);
+    const { existsSync, readFileSync } = require('node:fs');
+    if (!existsSync(logPath)) return null;
+
+    const content = readFileSync(logPath, 'utf-8');
+    const lines = content.split('\n');
+    
+    // Grab the last 150 lines
+    const tailLimit = 150;
+    const tailLines = lines.length > tailLimit ? lines.slice(-tailLimit) : lines;
+    
+    const logs = tailLines.join('\n').trim();
+    if (!logs) return null;
+    return logs;
+  } catch (err) {
+    // Non-fatal, just optionally log 
+    return null;
+  }
+}
+
+
+/**
  * Summarize a tool_use content block into a concise log line.
  * Delegates to the tool adapter for provider-agnostic canonical formatting.
  */
@@ -279,6 +316,7 @@ export function hasToolUsage(sessionId: string): boolean {
     const { readFileSync } = require('node:fs');
     const logPath = logPathForSession(sessionId);
     const content = readFileSync(logPath, 'utf-8');
+    
     // Check for multiple indicators of life:
     // 1. [tool] - our canonical prefix from formatStreamMessage
     // 2. </tool> or </tools> - common XML markers used by internal Gemini CLI tools
@@ -291,7 +329,17 @@ export function hasToolUsage(sessionId: string): boolean {
       /HANDOVER_CONTEXT:/i
     ];
 
-    return patterns.some(p => p.test(content));
+    if (!patterns.some(p => p.test(content))) return false;
+
+    // Additional check: did they actually DO something?
+    // If they only did 'ls', 'Glob', or 'Read', and didn't provide a PHASE_REPORT/HANDOVER,
+    // they might have just been looking around.
+    const hasWrite = /\[tool\] (Write|Edit|TodoWrite|Bash|RunCommand|supertag create|supertag edit|supertag set-field|supertag tag)/i.test(content);
+    const hasStructuredReport = /PHASE_REPORT:|HANDOVER_CONTEXT:/i.test(content);
+
+    // We allow completion if they either wrote something OR provided a structured report.
+    // Reading-only is not enough to mark a "monitoring" or "build" task as completed.
+    return hasWrite || hasStructuredReport;
   } catch {
     // If log doesn't exist or can't be read, assume tools were used (fail open)
     return true;

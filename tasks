@@ -1,19 +1,19 @@
 # project-a registers its upcoming features
 bun run dev work create --id "project-a-cache" \
   --title "Add semantic cache layer to database queries" \
-  --project "proj" --priority "P2" --source "local" --source-ref "./projects/proj"
+  --project "projA" --priority "P2" --source "local" --source-ref "./projects/projA"
 
-bun run dev work create --id "project-a-monitoring" \
+bun run dev work create --id "project-a-monitoring proceed" \
   --title "Health monitoring dashboard" \
-  --project "proj" --priority "P3" --source "local" --source-ref "./projects/proj"
+  --project "projA" --priority "P1" --source "local" --source-ref "./projects/projA"
 
 bun run dev work create --id "project-b-user-mgmt" \
   --title "User management with role-based access" \
-  --project "project-alpha" --priority "P1" --source "local" --source-ref "./projects/alpha"
+  --project "projA" --priority "P1" --source "local" --source-ref "./projects/projA"
 
 bun run dev work create --id "project-b-audit-log" \
   --title "Security audit logging for compliance" \
-  --project "project-alpha" --priority "P2" --source "local" --source-ref "./projects/alpha"
+  --project "projA" --priority "P2" --source "local" --source-ref "./projects/projA"
 
 Here are a few simple use cases designed to test agent handovers. Each use case is structured so that completing the goal naturally demands different specialized skills (e.g., planning, backend, frontend, qa, tech writing), forcing the blackboard to hand the task over to the most suitable agent at each stage.
 

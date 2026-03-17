@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 import type { CliContext } from '../cli.ts';
-import { getLauncher, logPathForSession, hasToolUsage } from '../scheduler/launcher.ts';
+import { getLauncher, logPathForSession, hasToolUsage, getPreviousAgentLogs } from '../scheduler/launcher.ts';
 import { loadAlgorithmTemplate } from '../hooks/pre-session.ts';
 import {
   stashIfDirty,
@@ -290,6 +290,18 @@ function buildPrompt(
       );
     } catch {
       parts.push(`\n## Handover Context\n\n${handoverContext}\n`);
+    }
+  } else {
+    // If no explicit handover context, try to recover logs from a previous crashed agent
+    const previousLogs = getPreviousAgentLogs(db, itemId, sessionId);
+    if (previousLogs) {
+      parts.push(
+        `\n## Previous Attempt Recovery\n`,
+        `A previous agent was working on this task but crashed or was interrupted.`,
+        `To avoid repeating their work, here are the final logs from their session:\n`,
+        `\`\`\`\n${previousLogs}\n\`\`\`\n`,
+        `Please review these logs to understand what they had already accomplished, and pick up where they left off.\n`
+      );
     }
   }
 
@@ -819,21 +831,27 @@ export function registerDispatchWorkerCommand(
           // No-work safeguard: if the agent used zero tools AND produced no handover,
           // it likely did nothing meaningful (e.g. stalled or looped).
           if (!hasToolUsage(sessionId)) {
-            bb.appendEvent({
-              actorId: sessionId,
-              targetId: itemId,
-              summary: `Agent exited 0 but used no tools for "${item.title}" — releasing as no-progress`,
-              metadata: { itemId, exitCode: 0, durationMs, noWorkDetected: true },
-            });
-            try {
-              bb.releaseWorkItem(itemId, sessionId, {
-                reason: 'Agent exited successfully but used no tools (no meaningful work)',
-                noProgress: true,
-                actorId: personaName ?? sessionId,
+            const phaseReport = parsePhaseReport(logPathForSession(sessionId));
+            
+            // Even if hasToolUsage is false, we might still allow completion if 
+            // the phase report explicitly says it is completed.
+            if (!phaseReport.completed) {
+              bb.appendEvent({
+                actorId: sessionId,
+                targetId: itemId,
+                summary: `Agent exited 0 but did no meaningful work for "${item.title}" — releasing as no-progress`,
+                metadata: { itemId, exitCode: 0, durationMs, noWorkDetected: true, lastPhase: phaseReport.lastPhase },
               });
-            } catch { /* best effort */ }
-            bb.deregisterAgent(sessionId);
-            return;
+              try {
+                bb.releaseWorkItem(itemId, sessionId, {
+                  reason: 'Agent exited successfully but did no meaningful work (no writes or structured report)',
+                  noProgress: true,
+                  actorId: personaName ?? sessionId,
+                });
+              } catch { /* best effort */ }
+              bb.deregisterAgent(sessionId);
+              return;
+            }
           }
 
           bb.completeWorkItem(itemId, sessionId);

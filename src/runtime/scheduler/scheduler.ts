@@ -153,6 +153,37 @@ function buildPrompt(item: BlackboardWorkItem, sessionId: string, db: import('bu
     console.error(`[hybrid-algorithm] Failed to load template: ${msg}`);
   }
 
+  // Inject handover context from previous agent if present
+  if (item.handover_context) {
+    try {
+      const handover = JSON.parse(item.handover_context);
+      parts.push(
+        `\n## Handover Context (from previous agent)\n`,
+        `The previous agent handed this task over with the following context:`,
+        `- **Progress:** ${handover.progress ?? 'Not specified'}`,
+        `- **Next Steps:** ${handover.next_steps ?? 'Not specified'}`,
+        handover.blockers ? `- **Blockers:** ${handover.blockers}` : '',
+        handover.notes ? `- **Notes:** ${handover.notes}` : '',
+        `\nPlease continue from where the previous agent left off.\n`,
+      );
+    } catch {
+      parts.push(`\n## Handover Context\n\n${item.handover_context}\n`);
+    }
+  } else {
+    // If no explicit handover context, try to recover logs from a previous crashed agent
+    const { getPreviousAgentLogs } = require('./launcher.ts');
+    const previousLogs = getPreviousAgentLogs(db, item.item_id, sessionId);
+    if (previousLogs) {
+      parts.push(
+        `\n## Previous Attempt Recovery\n`,
+        `A previous agent was working on this task but crashed or was interrupted.`,
+        `To avoid repeating their work, here are the final logs from their session:\n`,
+        `\`\`\`\n${previousLogs}\n\`\`\`\n`,
+        `Please review these logs to understand what they had already accomplished, and pick up where they left off.\n`
+      );
+    }
+  }
+
   parts.push(
     `When you are done, summarize what you accomplished.`,
     `If you cannot complete the task and need to hand it off, output a string exactly starting with HANDOVER_CONTEXT: on its own line.`,

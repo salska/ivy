@@ -1,0 +1,44 @@
+[0m
+test-kernel/persona-loader.test.ts:
+[0m
+test-kernel/persona-loader.test.ts:
+[0m[32m✓[0m [0mloadPersona[2m >[0m[1m loads a valid persona file and parses frontmatter[0m [0m[2m[2.73ms[0m[2m][0m
+[0m[32m✓[0m [0mloadPersona[2m >[0m[1m loads a valid persona file and parses frontmatter[0m [0m[2m[2.73ms[0m[2m][0m
+[0m[32m✓[0m [0mloadPersona[2m >[0m[1m returns null for missing file[0m [0m[2m[0.93ms[0m[2m][0m
+[0m[32m✓[0m [0mloadPersona[2m >[0m[1m returns null for missing file[0m [0m[2m[0.93ms[0m[2m][0m
+[0m[32m✓[0m [0mloadPersona[2m >[0m[1m strips PAI boilerplate from identity block[0m [0m[2m[0.72ms[0m[2m][0m
+[0m[32m✓[0m [0mloadPersona[2m >[0m[1m strips PAI boilerplate from identity block[0m [0m[2m[0.72ms[0m[2m][0m
+[0m[32m✓[0m [0mloadPersona[2m >[0m[1m marks sub-agents as non-dispatchable[0m [0m[2m[1.05ms[0m[2m][0m
+[0m[32m✓[0m [0mloadPersona[2m >[0m[1m marks sub-agents as non-dispatchable[0m [0m[2m[1.05ms[0m[2m][0m
+[0m[32m✓[0m [0mloadPersona[2m >[0m[1m extracts capability keywords from description[0m [0m[2m[0.74ms[0m[2m][0m
+[0m[32m✓[0m [0mloadPersona[2m >[0m[1m extracts capability keywords from description[0m [0m[2m[0.74ms[0m[2m][0m
+[0m[32m✓[0m [0mloadAllDispatchable[2m >[0m[1m returns only dispatchable personas[0m [0m[2m[1.23ms[0m[2m][0m
+[0m[32m✓[0m [0mloadAllDispatchable[2m >[0m[1m returns only dispatchable personas[0m [0m[2m[1.23ms[0m[2m][0m
+[0m[32m✓[0m [0mscoreBid[2m >[0m[1m scores Engineer highest for code/implementation tasks[0m [0m[2m[1.16ms[0m[2m][0m
+[0m[32m✓[0m [0mscoreBid[2m >[0m[1m scores Engineer highest for code/implementation tasks[0m [0m[2m[1.16ms[0m[2m][0m
+[0m[32m✓[0m [0mscoreBid[2m >[0m[1m scores Designer highest for design/UX tasks[0m [0m[2m[0.89ms[0m[2m][0m
+[0m[32m✓[0m [0mscoreBid[2m >[0m[1m scores Designer highest for design/UX tasks[0m [0m[2m[0.89ms[0m[2m][0m
+[0m[32m✓[0m [0mscoreBid[2m >[0m[1m scores QATester highest for testing tasks[0m [0m[2m[0.86ms[0m[2m][0m
+[0m[32m✓[0m [0mscoreBid[2m >[0m[1m scores QATester highest for testing tasks[0m [0m[2m[0.86ms[0m[2m][0m
+[0m[32m✓[0m [0mselectPersona[2m >[0m[1m explicit metadata override bypasses bidding[0m [0m[2m[1.09ms[0m[2m][0m
+[0m[32m✓[0m [0mselectPersona[2m >[0m[1m explicit metadata override bypasses bidding[0m [0m[2m[1.09ms[0m[2m][0m
+[0m[32m✓[0m [0mselectPersona[2m >[0m[1m returns null for override with missing persona file[0m [0m[2m[0.73ms[0m[2m][0m
+[0m[32m✓[0m [0mselectPersona[2m >[0m[1m returns null for override with missing persona file[0m [0m[2m[0.73ms[0m[2m][0m
+[0m[32m✓[0m [0mselectPersona[2m >[0m[1m selects best-fit persona via bidding when no override[0m [0m[2m[1.00ms[0m[2m][0m
+[0m[32m✓[0m [0mselectPersona[2m >[0m[1m selects best-fit persona via bidding when no override[0m [0m[2m[1.00ms[0m[2m][0m
+[0m[32m✓[0m [0mselectPersona[2m >[0m[1m falls back to Architect when no match[0m [0m[2m[1.13ms[0m[2m][0m
+[0m[32m✓[0m [0mselectPersona[2m >[0m[1m falls back to Architect when no match[0m [0m[2m[1.13ms[0m[2m][0m
+[0m[32m✓[0m [0mselectPersona[2m >[0m[1m handles invalid JSON metadata gracefully[0m [0m[2m[0.97ms[0m[2m][0m
+[0m[32m✓[0m [0mselectPersona[2m >[0m[1m handles invalid JSON metadata gracefully[0m [0m[2m[0.97ms[0m[2m][0m
+[0m[32m✓[0m [0mselectPersona[2m >[0m[1m handles metadata without agent_persona field[0m [0m[2m[1.05ms[0m[2m][0m
+[0m[32m✓[0m [0mselectPersona[2m >[0m[1m handles metadata without agent_persona field[0m [0m[2m[1.05ms[0m[2m][0m
+
+[0m[32m 15 pass[0m
+[0m[2m 0 fail[0m
+ 32 expect() calls
+Ran 15 tests across 1 file. [0m[2m[[1m32.00ms[0m[2m][0m
+
+[0m[32m 15 pass[0m
+[0m[2m 0 fail[0m
+ 32 expect() calls
+Ran 15 tests across 1 file. [0m[2m[[1m32.00ms[0m[2m][0m

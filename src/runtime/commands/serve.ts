@@ -2,6 +2,7 @@ import { Command } from 'commander';
 import type { CliContext } from '../cli.ts';
 import { startUnifiedServer } from '../serve/unified-server.ts';
 import { resolveDbPath } from '../../kernel/db';
+import { sweepStaleAgents } from '../../kernel/sweep.ts';
 import { dispatch } from '../scheduler/scheduler.ts';
 
 export function registerServeCommand(
@@ -34,6 +35,7 @@ export function registerServeCommand(
 
           const runDispatch = async () => {
             try {
+              sweepStaleAgents(ctx.bb.db);
               await dispatch(ctx.bb, {
                 maxConcurrent: 1,
                 maxItems: 5,
