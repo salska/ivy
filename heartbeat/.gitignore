@@ -1,0 +1,15 @@
+node_modules/
+.env
+.env.*
+*.db
+*.db-wal
+*.db-shm
+.DS_Store
+.specflow/*.db
+dist/
+*.bun-build
+.claude-checkpoint.md
+.cursor/
+ivy-heartbeat
+*.log
+*.plist
