@@ -9,7 +9,7 @@ export function registerExportCommand(
   getContext: () => CommandContext
 ): void {
   parent
-    .command("snapshot")
+    .command("export")
     .description("Export blackboard state as JSON snapshot")
     .option("--pretty", "Pretty-print JSON output")
     .option("--output <file>", "Write to file instead of stdout")

@@ -1,7 +1,7 @@
 import { mkdirSync, openSync, closeSync, appendFileSync } from 'node:fs';
 import type { Blackboard } from '../blackboard.ts';
 import type { BlackboardWorkItem } from '../../kernel/types';
-import { getLauncher, resolveLogDir, logPathForSession, hasToolUsage } from './launcher.ts';
+import { getLauncher, resolveLogDir, logPathForSession, hasToolUsage, hasActionUsage } from './launcher.ts';
 import { isMeaninglessHandover, parsePhaseReport } from '../parser/handover-parser.ts';
 import { loadAlgorithmTemplate } from '../hooks/pre-session.ts';
 import { buildPromptPreamble } from '../tool-adapter/index.ts';
@@ -295,6 +295,24 @@ export async function dispatch(
     // Register agent and claim work
     let sessionId: string;
     try {
+      // ─── Pre-flight: Work Directory check ───
+      // If the directory doesn't exist, skip instead of claiming and immediately crashing.
+      const { existsSync } = require('node:fs');
+      if (!existsSync(resolvedWorkDir)) {
+        result.skipped.push({
+          itemId: item.item_id,
+          title: item.title,
+          reason: `work directory does not exist: ${resolvedWorkDir}`,
+        });
+        bb.appendEvent({
+          actorId: 'scheduler',
+          targetId: item.item_id,
+          summary: `Skipped dispatch: work directory does not exist: ${resolvedWorkDir}`,
+          metadata: { itemId: item.item_id, projectId: item.project_id, workDir: resolvedWorkDir },
+        });
+        continue;
+      }
+
       const agent = bb.registerAgent({
         name: `dispatch-${item.item_id}`,
         project: item.project_id ?? 'general',
@@ -814,30 +832,6 @@ export async function dispatch(
             }
           }
 
-          // No-work safeguard: if the agent used zero tools, release instead of completing.
-          if (!hasToolUsage(sessionId)) {
-            bb.appendEvent({
-              actorId: sessionId,
-              targetId: item.item_id,
-              summary: `Agent exited 0 but used no tools for "${item.title}" — releasing as no-progress`,
-              metadata: { itemId: item.item_id, exitCode: 0, durationMs, noWorkDetected: true },
-            });
-            try {
-              bb.releaseWorkItem(item.item_id, sessionId, {
-                reason: 'Agent exited successfully but used no tools (no meaningful work)',
-                noProgress: true,
-                actorId: personaName ?? sessionId,
-              });
-            } catch { /* best effort */ }
-            bb.deregisterAgent(sessionId);
-            result.errors.push({
-              itemId: item.item_id,
-              title: item.title,
-              error: 'Agent exited 0 but used no tools (no meaningful work)',
-            });
-            continue;
-          }
-
           // --- HANDOVER ON SUCCESS ---
           // Check if agent did meaningful work but wants to hand over to another persona
           let didHandover = false;
@@ -905,6 +899,69 @@ export async function dispatch(
               exitCode: 0,
               completed: false, // Handed over, not truly completed
               durationMs,
+            });
+            continue;
+          }
+
+          // No-work safeguard: if the agent used zero tools AND produced no handover,
+          // it likely did nothing meaningful (e.g. stalled or looped).
+          const hasTools = hasToolUsage(sessionId);
+          const hasActions = hasActionUsage(sessionId);
+          const report = parsePhaseReport(logPathForSession(sessionId));
+
+          // Physical change verification: did the agent actually change files on disk?
+          // We check if the working tree is clean. If it's clean, no files were changed.
+          const isWorkingTreeClean = await isCleanBranch(resolvedWorkDir).catch(() => true);
+          const hasDiskChanges = !isWorkingTreeClean;
+
+          // Strict check for build tasks: must have actions unless it's a handover or completed report.
+          const isBuildTask = resolvedWorkDir.endsWith('cli-proj') || 
+                              /build|create|implement|add|fix|update|draft|spec/i.test(item.title);
+
+          if (!hasTools && !didHandover && !report.completed && !hasDiskChanges) {
+            bb.appendEvent({
+              actorId: sessionId,
+              targetId: item.item_id,
+              summary: `Agent exited 0 but did no meaningful work for "${item.title}" — releasing as no-progress`,
+              metadata: { itemId: item.item_id, exitCode: 0, durationMs, noWorkDetected: true, lastPhase: report.lastPhase, diskChanged: hasDiskChanges },
+            });
+            try {
+              bb.releaseWorkItem(item.item_id, sessionId, {
+                reason: 'Agent exited successfully but did no meaningful work (no tools, no disk changes, no handover)',
+                noProgress: true,
+                actorId: personaName ?? sessionId,
+              });
+            } catch { /* best effort */ }
+            bb.deregisterAgent(sessionId);
+            result.errors.push({
+              itemId: item.item_id,
+              title: item.title,
+              error: 'Agent exited 0 but did no meaningful work (no tools, no disk changes)',
+            });
+            continue;
+          }
+
+          if (isBuildTask && !hasActions && !didHandover && !report.completed && !hasDiskChanges) {
+            const reason = `Simulated work detected: build task reached phase "${report.lastPhase}" without using action tools (Write/Edit/Bash) or changing disk.`;
+            bb.appendEvent({
+              actorId: sessionId,
+              targetId: item.item_id,
+              summary: `Agent claimed completion for build task "${item.title}" but no disk changes were detected — releasing as no-progress`,
+              metadata: { itemId: item.item_id, exitCode: 0, durationMs, simulatedWorkDetected: true, lastPhase: report.lastPhase, diskChanged: hasDiskChanges },
+            });
+            try {
+              bb.releaseWorkItem(item.item_id, sessionId, {
+                reason,
+                noProgress: true,
+
+                actorId: personaName ?? sessionId,
+              });
+            } catch { /* best effort */ }
+            bb.deregisterAgent(sessionId);
+            result.errors.push({
+              itemId: item.item_id,
+              title: item.title,
+              error: reason,
             });
             continue;
           }

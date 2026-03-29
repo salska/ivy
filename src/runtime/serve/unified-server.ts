@@ -14,9 +14,9 @@ import { listAgents } from '../../kernel/agent';
 import {
     listWorkItems, getWorkItemStatus, deleteWorkItem,
     updateWorkItemMetadata, appendWorkItemEvent, flushActiveWorkItems,
-    flushAllDatabase
+    flushAllDatabase, createWorkItem
 } from '../../kernel/work';
-import { listProjects, getProjectDetail } from '../../kernel/project';
+import { listProjects, getProjectDetail, registerProject } from '../../kernel/project';
 import { observeEvents } from '../../kernel/events';
 import { queryLearnings, getSteeringRules } from '../../kernel/learnings';
 import type { BlackboardAgent } from '../../kernel/types';
@@ -364,6 +364,12 @@ export function startUnifiedServer(
                     const items = listWorkItems(db, { all, status, project });
                     return jsonOk({ count: items.length, items }, 200, cors);
                 }
+                if (path === '/api/work' && req.method === 'POST') {
+                    const body = await req.json() as any;
+                    if (!body.id) body.id = 'work-' + Math.random().toString(36).substring(2, 11);
+                    return jsonOk(createWorkItem(db, body), 200, cors);
+                }
+
 
                 if (path === '/api/work/flush' && req.method === 'POST') {
                     return jsonOk(flushActiveWorkItems(db), 200, cors);
@@ -435,6 +441,11 @@ export function startUnifiedServer(
                     const projects = listProjects(db);
                     return jsonOk({ count: projects.length, items: projects }, 200, cors);
                 }
+                if (path === '/api/projects' && req.method === 'POST') {
+                    const body = await req.json() as any;
+                    return jsonOk(registerProject(db, body), 200, cors);
+                }
+
 
                 // Project detail
                 const projMatch = path.match(/^\/api\/projects\/([^/]+)$/);

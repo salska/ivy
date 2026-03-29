@@ -56,6 +56,12 @@ const BOILERPLATE_SECTION_MARKERS = [
     'MANDATORY FIRST',
     'SESSION STARTUP',
     'MANDATORY:',
+    'Strategic Planning with /plan Mode',
+    'Micro-Cycle Development',
+    'Final Output Format',
+    'Project State and Session Recovery',
+    'Step-by-Step Instructions',
+    'Planning and Coordination',
 ];
 
 // ─── Cache ──────────────────────────────────────────────────────────────────
@@ -148,20 +154,23 @@ function isSubAgent(description: string, name: string): boolean {
  * Uses a section-level approach: splits on markdown headers, drops any section
  * whose header matches a boilerplate marker, then reassembles.
  */
-function stripBoilerplate(body: string): string {
+export function stripBoilerplate(body: string): string {
     // Split into sections by markdown headers (# ## ### etc.)
     const sections = body.split(/(?=^#{1,4}\s)/m);
 
     const kept = sections.filter(section => {
         const firstLine = section.split('\n')[0]?.trim() ?? '';
-        // Drop sections whose header contains any boilerplate marker
+        const upperHeader = firstLine.toUpperCase();
+        // Drop sections whose header contains any boilerplate marker (case-insensitive)
         const isBoilerplate = BOILERPLATE_SECTION_MARKERS.some(marker =>
-            firstLine.includes(marker)
+            upperHeader.includes(marker.toUpperCase())
         );
         if (isBoilerplate) return false;
 
-        // Also drop sections that are mostly curl notification blocks
+        // Also drop sections that are mostly curl notification blocks or voice boilerplate
         if (section.includes('curl -X POST http://localhost:8888')) return false;
+        if (section.toLowerCase().includes('voice notification')) return false;
+        if (section.toLowerCase().includes('startup sound')) return false;
 
         return true;
     });

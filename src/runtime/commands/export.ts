@@ -8,7 +8,7 @@ export function registerExportCommand(
   getContext: () => CliContext
 ): void {
   parent
-    .command('export')
+    .command('daily-log')
     .description('Export daily log from events')
     .option('--date <YYYY-MM-DD>', 'Date to export (defaults to today)')
     .action((opts) => {

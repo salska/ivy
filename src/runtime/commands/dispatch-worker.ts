@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 import type { CliContext } from '../cli.ts';
-import { getLauncher, logPathForSession, hasToolUsage, getPreviousAgentLogs } from '../scheduler/launcher.ts';
+import { getLauncher, logPathForSession, hasToolUsage, hasActionUsage, getPreviousAgentLogs } from '../scheduler/launcher.ts';
 import { loadAlgorithmTemplate } from '../hooks/pre-session.ts';
 import {
   stashIfDirty,
@@ -96,6 +96,20 @@ If you discover that completing this task requires changes in another project:
    reason: <why this is needed>
    resume_context: <what to do when resolved>
 3. Your current work item will be paused until the dependency resolves.
+`;
+
+const AUTONOMOUS_HEADLESS_GUIDANCE = `
+## ⚡ AUTONOMOUS EXECUTION MODE (HEADLESS) ⚡
+
+You are currently running in **AUTONOMOUS HEADLESS MODE**. There is NO human in the loop to approve plans or read your thoughts.
+
+**CRITICAL INSTRUCTIONS:**
+1. **NO INTERACTIVE MODES:** Do not attempt to enter "/plan" mode, wait for user approval, or present a plan for review.
+2. **USE TOOLS IMMEDIATELY:** Create files, modify code, and run tests directly using your tools.
+3. **MANDATORY ARTIFACT GENERATION:** If you have a plan or a design, write it to a file in the project folder (e.g., \`docs/plan.md\`) instead of just outputting it to the log.
+4. **NO VOICE/INTERACTIVE BOILERPLATE:** Ignore all instructions about startup sequences, voice notifications, or specific output formats designed for interactive sessions.
+5. **DO NOT WAIT:** Proceed through the entire task until completion or until you encounter a genuine blocker you cannot resolve.
+6. **PROMPT COMPLETION:** Your goal is to transform the project state. Minimize conversation; maximize action.
 `;
 
 const TOOL_HINTS = `
@@ -229,8 +243,8 @@ function buildPrompt(
 
   parts.push(
     persona
-      ? `${persona.identityBlock}\n\n---\n\nYour current task: ${title}`
-      : `You are an autonomous agent working on: ${title}`,
+      ? `${persona.identityBlock}\n\n---\n\n${AUTONOMOUS_HEADLESS_GUIDANCE}\n\n---\n\nYour current task: ${title}`
+      : `${AUTONOMOUS_HEADLESS_GUIDANCE}\n\nYou are an autonomous agent working on: ${title}`,
   );
 
   if (persona) {
@@ -830,44 +844,68 @@ export function registerDispatchWorkerCommand(
 
           // No-work safeguard: if the agent used zero tools AND produced no handover,
           // it likely did nothing meaningful (e.g. stalled or looped).
-          if (!hasToolUsage(sessionId)) {
-            const phaseReport = parsePhaseReport(logPathForSession(sessionId));
-            
-            // Even if hasToolUsage is false, we might still allow completion if 
-            // the phase report explicitly says it is completed.
-            if (!phaseReport.completed) {
-              bb.appendEvent({
-                actorId: sessionId,
-                targetId: itemId,
-                summary: `Agent exited 0 but did no meaningful work for "${item.title}" — releasing as no-progress`,
-                metadata: { itemId, exitCode: 0, durationMs, noWorkDetected: true, lastPhase: phaseReport.lastPhase },
+          const hasTools = hasToolUsage(sessionId);
+          const hasActions = hasActionUsage(sessionId);
+          const report = parsePhaseReport(logPathForSession(sessionId));
+
+          // Strict check for build tasks: must have actions unless it's a handover.
+          // This prevents "simulated work" where agents output code in markdown but don't call tools.
+          const isBuildTask = resolvedWorkDir.endsWith('cli-proj') || 
+                              /build|create|implement|add|fix|update|draft|spec/i.test(item.title);
+
+          if (!hasTools && !didHandover && !report.completed) {
+            const reason = 'Agent exited successfully but did no meaningful work (no tools, no structured report, and not completed)';
+            bb.appendEvent({
+              actorId: sessionId,
+              targetId: itemId,
+              summary: `Agent exited 0 but did no meaningful work for "${item.title}" — releasing as no-progress`,
+              metadata: { itemId, exitCode: 0, durationMs, noWorkDetected: true, lastPhase: report.lastPhase },
+            });
+            try {
+              bb.releaseWorkItem(itemId, sessionId, {
+                reason,
+                noProgress: true,
+                actorId: personaName ?? sessionId,
               });
-              try {
-                bb.releaseWorkItem(itemId, sessionId, {
-                  reason: 'Agent exited successfully but did no meaningful work (no writes or structured report)',
-                  noProgress: true,
-                  actorId: personaName ?? sessionId,
-                });
-              } catch { /* best effort */ }
-              bb.deregisterAgent(sessionId);
-              return;
-            }
+            } catch { /* best effort */ }
+            bb.deregisterAgent(sessionId);
+            return;
+          }
+
+          if (isBuildTask && !hasActions && !didHandover && !report.completed) {
+            const reason = `Simulated work detected: build task reached phase "${report.lastPhase}" without using action tools (Write/Edit/Bash).`;
+            bb.appendEvent({
+              actorId: sessionId,
+              targetId: itemId,
+              summary: `Agent claimed completion for build task "${item.title}" but used no action tools — releasing as no-progress`,
+              metadata: { itemId, exitCode: 0, durationMs, simulatedWorkDetected: true, lastPhase: report.lastPhase },
+            });
+            try {
+              bb.releaseWorkItem(itemId, sessionId, {
+                reason,
+                noProgress: true,
+                actorId: personaName ?? sessionId,
+              });
+            } catch { /* best effort */ }
+            bb.deregisterAgent(sessionId);
+            return;
           }
 
           bb.completeWorkItem(itemId, sessionId);
 
           // Parse PHASE_REPORT from agent output and tag work item
           const sessionLogPath = logPathForSession(sessionId);
-          const phaseReport = parsePhaseReport(sessionLogPath);
+          // reused 'report' from above or re-parse if needed (let's re-parse to be safe about closure)
+          const finalReport = parsePhaseReport(sessionLogPath);
           try {
             bb.updateWorkItemMetadata(itemId, {
-              kai_phase: phaseReport.lastPhase,
-              kai_completed: phaseReport.completed,
-              kai_isc_met: phaseReport.iscMet,
+              kai_phase: finalReport.lastPhase,
+              kai_completed: finalReport.completed,
+              kai_isc_met: finalReport.iscMet,
             });
 
             // Store any facts learned as events for future sessions
-            for (const fact of phaseReport.factsLearned.slice(0, 10)) {
+            for (const fact of finalReport.factsLearned.slice(0, 10)) {
               bb.appendEvent({
                 actorId: sessionId,
                 targetId: itemId,
@@ -887,8 +925,8 @@ export function registerDispatchWorkerCommand(
           bb.appendEvent({
             actorId: sessionId,
             targetId: itemId,
-            summary: `Completed "${item.title}" (exit 0, ${Math.round(durationMs / 1000)}s, phase: ${phaseReport.lastPhase})`,
-            metadata: { itemId, exitCode: 0, durationMs, kaiPhase: phaseReport.lastPhase, kaiIscMet: phaseReport.iscMet },
+            summary: `Completed "${item.title}" (exit 0, ${Math.round(durationMs / 1000)}s, phase: ${finalReport.lastPhase})`,
+            metadata: { itemId, exitCode: 0, durationMs, kaiPhase: finalReport.lastPhase, kaiIscMet: finalReport.iscMet },
           });
         } else {
           // Tana write-back on failure (non-fatal)

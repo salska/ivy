@@ -146,12 +146,15 @@ export function buildPromptPreamble(provider?: ToolProvider): string {
         '',
         'The instructions below may reference tool names from Claude Code.',
         `You are running on **${adapter.provider}** which has different tool names.`,
-        'When the prompt says to use a Claude tool, use the equivalent below:',
+        'When the prompt says to use a Claude tool, follow these rules:',
         '',
         ...mappingLines,
         '',
-        'Use the **right-hand side** tool names in all your tool calls.',
-        'Do not invent tool names. Only call tools that are available to you.',
+        '### CRITICAL RULES',
+        '1. **Use ACTUAL tool calls**: Call `write_file`, `replace`, etc. using the JSON protocol. Do NOT just write them in markdown.',
+        '2. **No "Simulated" work**: Simply outputting plans, markdown blocks, or summaries does NOT change files on disk. You MUST execute the tools.',
+        '3. **Use the mapping**: Use the **right-hand side** tool names in all your tool calls.',
+        '4. **Tangibility**: If you exit without calling action tools (Write/Edit/Bash) for a build task, the system will reject your session as "no-progress".',
         '',
     ].join('\n');
 }

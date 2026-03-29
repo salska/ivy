@@ -26,6 +26,8 @@ export interface LaunchOptions {
   sessionId: string;
   /** Disable all MCP servers (uses --strict-mcp-config with no config) */
   disableMcp?: boolean;
+  /** Explicit model override */
+  model?: string;
 }
 
 export interface LaunchResult {

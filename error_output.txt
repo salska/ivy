@@ -1,0 +1,33 @@
+Resolving dependencies
+Resolved, downloaded and extracted [2044]
+Saved lockfile
+Loaded cached credentials.
+Attempt 1 failed: You have exhausted your capacity on this model.. Retrying after 10763ms...
+Attempt 2 failed: You have exhausted your capacity on this model.. Retrying after 20316ms...
+Attempt 3 failed: You have exhausted your capacity on this model.. Retrying after 31672ms...
+Attempt 4 failed: You have exhausted your capacity on this model.. Retrying after 34239ms...
+Attempt 5 failed: You have exhausted your capacity on this model.. Retrying after 30044ms...
+Attempt 6 failed: You have exhausted your capacity on this model.. Retrying after 34255ms...
+Attempt 7 failed: You have exhausted your capacity on this model.. Retrying after 35696ms...
+Attempt 8 failed: You have exhausted your capacity on this model.. Retrying after 33918ms...
+Attempt 9 failed: You have exhausted your capacity on this model.. Retrying after 34365ms...
+Attempt 10 failed: You have exhausted your capacity on this model.. Max attempts reached
+Error when talking to Gemini API Full report available at: /var/folders/4z/1rf3_yd51n95g0dxz3ld309h0000gn/T/gemini-client-error-Turn.run-sendMessageStream-2026-03-28T21-34-03-478Z.json RetryableQuotaError: You have exhausted your capacity on this model.
+    at classifyGoogleError (file:///private/var/folders/4z/1rf3_yd51n95g0dxz3ld309h0000gn/T/bunx-501-@google/gemini-cli@latest/node_modules/@google/gemini-cli-core/dist/src/utils/googleQuotaErrors.js:249:28)
+    at retryWithBackoff (file:///private/var/folders/4z/1rf3_yd51n95g0dxz3ld309h0000gn/T/bunx-501-@google/gemini-cli@latest/node_modules/@google/gemini-cli-core/dist/src/utils/retry.js:190:37)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async GeminiChat.makeApiCallAndProcessStream (file:///private/var/folders/4z/1rf3_yd51n95g0dxz3ld309h0000gn/T/bunx-501-@google/gemini-cli@latest/node_modules/@google/gemini-cli-core/dist/src/core/geminiChat.js:453:32)
+    at async GeminiChat.streamWithRetries (file:///private/var/folders/4z/1rf3_yd51n95g0dxz3ld309h0000gn/T/bunx-501-@google/gemini-cli@latest/node_modules/@google/gemini-cli-core/dist/src/core/geminiChat.js:267:40)
+    at async Turn.run (file:///private/var/folders/4z/1rf3_yd51n95g0dxz3ld309h0000gn/T/bunx-501-@google/gemini-cli@latest/node_modules/@google/gemini-cli-core/dist/src/core/turn.js:71:30)
+    at async GeminiClient.processTurn (file:///private/var/folders/4z/1rf3_yd51n95g0dxz3ld309h0000gn/T/bunx-501-@google/gemini-cli@latest/node_modules/@google/gemini-cli-core/dist/src/core/client.js:494:26)
+    at async GeminiClient.sendMessageStream (file:///private/var/folders/4z/1rf3_yd51n95g0dxz3ld309h0000gn/T/bunx-501-@google/gemini-cli@latest/node_modules/@google/gemini-cli-core/dist/src/core/client.js:613:20)
+    at async file:///private/var/folders/4z/1rf3_yd51n95g0dxz3ld309h0000gn/T/bunx-501-@google/gemini-cli@latest/node_modules/@google/gemini-cli/dist/src/nonInteractiveCli.js:195:34
+    at async main (file:///private/var/folders/4z/1rf3_yd51n95g0dxz3ld309h0000gn/T/bunx-501-@google/gemini-cli@latest/node_modules/@google/gemini-cli/dist/src/gemini.js:452:9) {
+  cause: {
+    code: 429,
+    message: 'You have exhausted your capacity on this model.',
+    details: [ [Object], [Object] ]
+  },
+  retryDelayMs: 10000
+}
+An unexpected critical error occurred:[object Object]

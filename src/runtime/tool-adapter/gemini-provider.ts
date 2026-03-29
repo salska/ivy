@@ -57,12 +57,16 @@ export const geminiProvider: ProviderAdapter = {
         return GEMINI_TO_CLAUDE[native] ?? native;
     },
 
-    buildCLIArgs(prompt: string, _options?: LaunchAdapterOptions): string[] {
+    buildCLIArgs(prompt: string, options?: LaunchAdapterOptions): string[] {
         // -p forces non-interactive (headless) mode
         // --yolo auto-approves all tools (without this, Gemini CLI excludes
         //   run_shell_command, replace, write_file, web_fetch in non-interactive mode)
         // --output-format stream-json for structured streaming output
-        return ['gemini', '-p', prompt, '--yolo', '--output-format', 'stream-json'];
+        const args = ['gemini', '-p', prompt, '--yolo', '--output-format', 'stream-json'];
+        if (options?.model) {
+            args.push('--model', options.model);
+        }
+        return args;
     },
 
     parseToolUse(block: unknown): ToolCall | null {

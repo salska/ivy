@@ -119,7 +119,7 @@ describe("serializeSnapshot", () => {
 describe("CLI export", () => {
   test("export outputs valid JSON snapshot", async () => {
     const proc = Bun.spawn(
-      ["bun", "src/cli.ts", "--db", dbPath, "--json", "snapshot"],
+      ["bun", "src/cli.ts", "--db", dbPath, "--json", "export"],
       { cwd: PROJECT_ROOT, stdout: "pipe", stderr: "pipe" }
     );
     const text = await new Response(proc.stdout).text();
@@ -132,7 +132,7 @@ describe("CLI export", () => {
 
   test("export --pretty outputs indented JSON", async () => {
     const proc = Bun.spawn(
-      ["bun", "src/cli.ts", "--db", dbPath, "--json", "snapshot", "--pretty"],
+      ["bun", "src/cli.ts", "--db", dbPath, "--json", "export", "--pretty"],
       { cwd: PROJECT_ROOT, stdout: "pipe", stderr: "pipe" }
     );
     const text = await new Response(proc.stdout).text();
@@ -146,7 +146,7 @@ describe("CLI export", () => {
   test("export --output writes to file", async () => {
     const outPath = join(tmpDir, "export.json");
     const proc = Bun.spawn(
-      ["bun", "src/cli.ts", "--db", dbPath, "snapshot", "--output", outPath],
+      ["bun", "src/cli.ts", "--db", dbPath, "export", "--output", outPath],
       { cwd: PROJECT_ROOT, stdout: "pipe", stderr: "pipe" }
     );
     const text = await new Response(proc.stdout).text();
@@ -162,7 +162,7 @@ describe("CLI export", () => {
   test("export --output --json confirms with JSON envelope", async () => {
     const outPath = join(tmpDir, "export2.json");
     const proc = Bun.spawn(
-      ["bun", "src/cli.ts", "--db", dbPath, "--json", "snapshot", "--output", outPath],
+      ["bun", "src/cli.ts", "--db", dbPath, "--json", "export", "--output", outPath],
       { cwd: PROJECT_ROOT, stdout: "pipe", stderr: "pipe" }
     );
     const text = await new Response(proc.stdout).text();

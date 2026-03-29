@@ -138,51 +138,66 @@ function formatStreamMessage(msg: any): string | null {
  */
 async function streamJsonToLog(
   stream: ReadableStream<Uint8Array>,
-  logPath: string
+  logPath: string,
+  signal?: AbortSignal
 ): Promise<string> {
   const reader = stream.getReader();
   const decoder = new TextDecoder();
   const chunks: string[] = [];
   let buffer = '';
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
+  const cancelReader = () => { reader.cancel().catch(() => {}) };
+  signal?.addEventListener('abort', cancelReader);
 
-    const text = decoder.decode(value, { stream: true });
-    chunks.push(text);
-    buffer += text;
+  try {
+    while (true) {
+      if (signal?.aborted) {
+        reader.cancel().catch(() => {});
+        break;
+      }
 
-    // Process complete lines (each stream-json message is one line)
-    const lines = buffer.split('\n');
-    buffer = lines.pop() ?? ''; // Keep incomplete last line in buffer
-
-    for (const line of lines) {
-      if (!line.trim()) continue;
+      let done: boolean, value: Uint8Array | undefined;
       try {
-        const msg = JSON.parse(line);
-        const formatted = formatStreamMessage(msg);
-        if (formatted) {
-          appendFileSync(logPath, formatted + '\n');
-        }
+        const result = await reader.read();
+        done = result.done;
+        value = result.value;
       } catch {
-        // Not valid JSON — write raw line
-        if (line.trim().length > 0) {
+        break;
+      }
+      if (done) break;
+
+      const text = decoder.decode(value, { stream: true });
+      chunks.push(text);
+      buffer += text;
+
+      // Process complete lines (each stream-json message is one line)
+      let parts = buffer.split('\n');
+      buffer = parts.pop() ?? '';
+      
+      for (const line of parts) {
+        if (!line.trim()) continue;
+        try {
+          const msg = JSON.parse(line);
+          const formatted = formatStreamMessage(msg);
+          if (formatted) appendFileSync(logPath, formatted + '\n');
+        } catch {
           appendFileSync(logPath, line + '\n');
         }
       }
     }
-  }
 
-  // Flush remaining buffer
-  if (buffer.trim()) {
-    try {
-      const msg = JSON.parse(buffer);
-      const formatted = formatStreamMessage(msg);
-      if (formatted) appendFileSync(logPath, formatted + '\n');
-    } catch {
-      appendFileSync(logPath, buffer + '\n');
+    // Flush remaining buffer
+    if (buffer.trim()) {
+      try {
+        const msg = JSON.parse(buffer);
+        const formatted = formatStreamMessage(msg);
+        if (formatted) appendFileSync(logPath, formatted + '\n');
+      } catch {
+        appendFileSync(logPath, buffer + '\n');
+      }
     }
+  } finally {
+    signal?.removeEventListener('abort', cancelReader);
   }
 
   return chunks.join('');
@@ -230,57 +245,196 @@ async function defaultLauncher(opts: LaunchOptions): Promise<LaunchResult> {
   mkdirSync(logDir, { recursive: true });
 
   const logPath = logPathForSession(opts.sessionId);
-  const startTime = Date.now();
+  let currentModel = opts.model;
 
-  // Write header to log file
-  appendFileSync(logPath, [
-    `=== Dispatch Session: ${opts.sessionId} ===`,
-    `Work Dir: ${opts.workDir}`,
-    `Started: ${new Date(startTime).toISOString()}`,
-    `Timeout: ${opts.timeoutMs / 1000}s`,
-    `---`,
-    `Prompt: ${opts.prompt}`,
-    `===`,
-    '',
-  ].join('\n'));
+  // Models to try in order when quota is exhausted
+  const FALLBACK_MODELS = [
+    'gemini-2.5-flash',
+    'gemini-2.5-pro',
+    'gemini-2.0-flash-exp',
+    'gemini-exp-1206',
+  ];
+  const triedModels = new Set<string | undefined>();
 
-  // Build launch args via the tool adapter — no provider-specific branching here
-  const args = buildLaunchArgs(opts.prompt, {
-    disableMcp: opts.disableMcp,
-  });
+  while (true) {
+    triedModels.add(currentModel);
+    const startTime = Date.now();
 
-  const proc = Bun.spawn(args, {
-    cwd: opts.workDir,
-    stdout: 'pipe',
-    stderr: 'pipe',
-    env: {
-      ...process.env,
-      // Fix for Node.js DNS resolution issues (ENOTFOUND) specifically when hitting
-      // internal/Google APIs from node-based CLI tools (like the Gemini CLI)
-      NODE_OPTIONS: `${process.env.NODE_OPTIONS || ''} --dns-result-order=ipv4first`.trim()
-    },
-  });
+    // Write header to log file
+    appendFileSync(logPath, [
+      `=== Dispatch Session: ${opts.sessionId} ===`,
+      `Work Dir: ${opts.workDir}`,
+      `Started: ${new Date(startTime).toISOString()}`,
+      `Timeout: ${opts.timeoutMs / 1000}s`,
+      currentModel ? `Model Override: ${currentModel}` : `Model Override: None (default)`,
+      `---`,
+      `Prompt: ${opts.prompt}`,
+      `===`,
+      '',
+    ].join('\n'));
 
-  // Set up timeout
-  const timeoutId = setTimeout(() => {
-    appendFileSync(logPath, `\n=== TIMEOUT (${opts.timeoutMs / 1000}s) — sending SIGTERM ===\n`);
-    proc.kill('SIGTERM');
-  }, opts.timeoutMs);
+    // Build launch args via the tool adapter — no provider-specific branching here
+    const args = buildLaunchArgs(opts.prompt, {
+      disableMcp: opts.disableMcp,
+      model: currentModel,
+    });
 
-  // Stream stdout (JSON) and stderr to log file in parallel
-  const [stdout, stderr] = await Promise.all([
-    streamJsonToLog(proc.stdout as ReadableStream<Uint8Array>, logPath),
-    streamStderrToLog(proc.stderr as ReadableStream<Uint8Array>, logPath),
-  ]);
+    const proc = Bun.spawn(args, {
+      cwd: opts.workDir,
+      stdout: 'pipe',
+      stderr: 'pipe',
+      env: {
+        ...process.env,
+        // Fix for Node.js DNS resolution issues (ENOTFOUND) specifically when hitting
+        // internal/Google APIs from node-based CLI tools (like the Gemini CLI)
+        NODE_OPTIONS: `${process.env.NODE_OPTIONS || ''} --dns-result-order=ipv4first`.trim()
+      },
+    });
 
-  const exitCode = await proc.exited;
-  clearTimeout(timeoutId);
+    // Set up timeout
+    const timeoutId = setTimeout(() => {
+      appendFileSync(logPath, `\n=== TIMEOUT (${opts.timeoutMs / 1000}s) — sending SIGTERM ===\n`);
+      proc.kill('SIGTERM');
+    }, opts.timeoutMs);
 
-  // Write footer
-  const durationSec = Math.round((Date.now() - startTime) / 1000);
-  appendFileSync(logPath, `\n=== Exit Code: ${exitCode} | Duration: ${durationSec}s ===\n`);
+    const abortController = new AbortController();
 
-  return { exitCode, stdout, stderr };
+    // Stream stderr with early-kill on quota exhaustion.
+    // The Gemini CLI retries the same exhausted model 9+ times (~30s each)
+    // before throwing TerminalQuotaError. We detect the first retry message
+    // and kill the process immediately to avoid wasting ~5 minutes.
+    let quotaDetected = false;
+    const stderrPromise = (async () => {
+      const reader = (proc.stderr as ReadableStream<Uint8Array>).getReader();
+      const decoder = new TextDecoder();
+      const chunks: string[] = [];
+
+      const cancelReader = () => { reader.cancel().catch(() => {}) };
+      abortController.signal.addEventListener('abort', cancelReader);
+
+      try {
+        while (true) {
+          if (abortController.signal.aborted) {
+            reader.cancel().catch(() => {});
+            break;
+          }
+
+          let done: boolean, value: Uint8Array | undefined;
+          try {
+            const result = await reader.read();
+            done = result.done;
+            value = result.value;
+          } catch {
+            break;
+          }
+          if (done) break;
+
+          const text = decoder.decode(value, { stream: true });
+          chunks.push(text);
+
+          // Early kill: detect quota exhaustion, model missing, or persistent server errors
+          // to avoid waiting for the CLI to exhaust its internal retries.
+          if (!quotaDetected && (
+            text.includes('exhausted your capacity') || 
+            text.includes('Attempt 1 failed') || 
+            text.includes('ModelNotFoundError')
+          )) {
+            quotaDetected = true;
+            const killMsg = `[system] 🔪 API error detected on model "${currentModel || 'default'}" — aborting current attempt`;
+            appendFileSync(logPath, `\n${killMsg}\n`);
+            proc.kill('SIGKILL'); // Use SIGKILL to prevent the CLI from catching it
+            abortController.abort(); // Unblock both stderr and stdout immediately
+            break; // Stop reading stderr
+          }
+
+          if (quotaDetected) {
+          // Skip logging the rest of the noisy stack trace
+          continue;
+        }
+
+        try {
+          const lines = text.split('\n');
+          for (const line of lines) {
+            if (line.trim().length > 0) {
+              appendFileSync(logPath, `[stderr] ${line}\n`);
+            }
+          }
+        } catch { }
+      }
+      } finally {
+        abortController.signal.removeEventListener('abort', cancelReader);
+      }
+
+      return chunks.join('');
+    })();
+
+    // Stream stdout (JSON) to log file in parallel
+    const [stdout, stderr] = await Promise.all([
+      streamJsonToLog(proc.stdout as ReadableStream<Uint8Array>, logPath, abortController.signal),
+      stderrPromise,
+    ]);
+
+    const exitCode = await proc.exited;
+    clearTimeout(timeoutId);
+
+    // Write footer
+    const durationSec = Math.round((Date.now() - startTime) / 1000);
+    appendFileSync(logPath, `\n=== Exit Code: ${exitCode === null ? 'KILLED' : exitCode} | Duration: ${durationSec}s ===\n`);
+
+    // If we hit a quota error OR a model not found error, try to fall back
+    const isModelNotFound = exitCode !== 0 && stderr.includes('ModelNotFoundError');
+    const isRecoverableError = quotaDetected || (exitCode !== 0 && stderr.includes('TerminalQuotaError') && stderr.includes('exhausted your capacity')) || isModelNotFound;
+
+    if (isRecoverableError) {
+      if (process.stdout.isTTY) {
+        console.log(`\n❌ Gemini API Error (${isModelNotFound ? 'ModelNotFoundError' : 'TerminalQuotaError'})`);
+        const available = FALLBACK_MODELS.filter(m => !triedModels.has(m));
+        if (available.length === 0) {
+          console.log('⛔ All fallback models exhausted. Giving up.');
+          break;
+        }
+
+        const answer = await new Promise<string>((resolve) => {
+          const rl = require('node:readline').createInterface({
+            input: process.stdin,
+            output: process.stdout
+          });
+          rl.question(`\nSelect a model to retry [1-${available.length + 1}]:\n` +
+            available.map((m, i) => `${i + 1}. ${m}`).join('\n') +
+            `\n${available.length + 1}. Give up\n> `, (ans: string) => {
+              rl.close();
+              resolve(ans.trim());
+            });
+        });
+
+        const choice = parseInt(answer, 10);
+        if (choice > 0 && choice <= available.length) {
+          currentModel = available[choice - 1];
+          continue;
+        } else {
+          break;
+        }
+      } else {
+        // Headless execution: cascade through fallback models
+        const nextModel = FALLBACK_MODELS.find(m => !triedModels.has(m));
+        if (nextModel) {
+          currentModel = nextModel;
+          const reason = isModelNotFound ? 'Model Not Found' : 'Quota Exhausted';
+          const msg = `[system] ❌ ${reason} on ${[...triedModels].filter(Boolean).pop() || 'default model'}. 🔄 Auto-retrying with model: ${currentModel}...`;
+          appendFileSync(logPath, `\n${msg}\n\n`);
+          console.log(`[Dispatch Session ${opts.sessionId}] ${msg}`);
+          continue;
+        }
+        
+        appendFileSync(logPath, `\n[system] ⛔ All fallback models exhausted (tried: ${[...triedModels].filter(Boolean).join(', ')}). Giving up.\n\n`);
+        break;
+      }
+    }
+
+    return { exitCode, stdout, stderr };
+  }
+
+  return { exitCode: 1, stdout: '', stderr: 'All fallback models exhausted' };
 }
 
 let currentLauncher: SessionLauncher = defaultLauncher;
@@ -308,40 +462,77 @@ export function resetLauncher(): void {
 
 /**
  * Check if a session log contains evidence of tool usage.
- * Returns false if the agent never invoked a single tool — a strong signal
- * that it did no meaningful work (e.g. just output a generic "how can I help" message).
+ * Returns false if the agent never invoked a single tool.
  */
 export function hasToolUsage(sessionId: string): boolean {
   try {
-    const { readFileSync } = require('node:fs');
+    const { readFileSync, existsSync } = require('node:fs');
     const logPath = logPathForSession(sessionId);
+    if (!existsSync(logPath)) return true; // fail open if no log
+    
     const content = readFileSync(logPath, 'utf-8');
     
+    // Skip the prompt preamble — it contains instructions that match our patterns.
+    // The preamble ends with === on its own line.
+    const parts = content.split('\n===\n');
+    if (parts.length < 2) return true; // Unusual format, fail open
+    const agentOutput = parts.slice(1).join('\n===\n');
+
     // Check for multiple indicators of life:
     // 1. [tool] - our canonical prefix from formatStreamMessage
     // 2. </tool> or </tools> - common XML markers used by internal Gemini CLI tools
     // 3. PHASE_REPORT: or HANDOVER_CONTEXT: - structured agent reports
+    // 4. --- RESULT --- - The final section emitted by the launcher
     const patterns = [
       /\[tool\]/i,
       /<\/tool>/i,
       /<\/tools>/i,
       /PHASE_REPORT:/i,
-      /HANDOVER_CONTEXT:/i
+      /HANDOVER_CONTEXT:/i,
+      /--- RESULT ---/i
     ];
 
-    if (!patterns.some(p => p.test(content))) return false;
+    if (!patterns.some(p => p.test(agentOutput))) return false;
 
-    // Additional check: did they actually DO something?
-    // If they only did 'ls', 'Glob', or 'Read', and didn't provide a PHASE_REPORT/HANDOVER,
-    // they might have just been looking around.
-    const hasWrite = /\[tool\] (Write|Edit|TodoWrite|Bash|RunCommand|supertag create|supertag edit|supertag set-field|supertag tag)/i.test(content);
-    const hasStructuredReport = /PHASE_REPORT:|HANDOVER_CONTEXT:/i.test(content);
-
-    // We allow completion if they either wrote something OR provided a structured report.
-    // Reading-only is not enough to mark a "monitoring" or "build" task as completed.
-    return hasWrite || hasStructuredReport;
+    // We allow completion if they either performed an action OR provided a structured report.
+    // This allows pure research/planning phases to succeed.
+    return (
+      hasActionUsage(sessionId) || 
+      /PHASE_REPORT:|HANDOVER_CONTEXT:/i.test(agentOutput)
+    );
   } catch {
-    // If log doesn't exist or can't be read, assume tools were used (fail open)
-    return true;
+    return true; // fail open
+  }
+}
+
+/**
+ * Check if a session log contains evidence of ACTION tool usage.
+ * Action tools are those that modify the filesystem or perform side-effects.
+ */
+export function hasActionUsage(sessionId: string): boolean {
+  try {
+    const { readFileSync, existsSync } = require('node:fs');
+    const logPath = logPathForSession(sessionId);
+    if (!existsSync(logPath)) return false;
+
+    const content = readFileSync(logPath, 'utf-8');
+    
+    // Skip prompt preamble
+    const parts = content.split('\n===\n');
+    if (parts.length < 2) return false;
+    const agentOutput = parts.slice(1).join('\n===\n');
+
+    // Action tools must have been at least attempted.
+    // We look for [tool] followed by an action tool name.
+    // We expanded this to include Write, Edit, TodoWrite, and Bash, 
+    // AND we now check for any tool that doesn't look like a read-only one.
+    const actionPattern = /\[tool\] (Write|Edit|TodoWrite|Bash|RunCommand|supertag (create|edit|set-field|tag|done|undone|trash))/i;
+    
+    // Also consider any tool use that isn't Glob, Read, Search, ls, or Help as a potential "action"
+    const genericToolPattern = /\[tool\] (?!(Glob|Read|Search|ls|Help|TanaSearch|nodes show|tags list|tags show|query))/i;
+
+    return actionPattern.test(agentOutput) || genericToolPattern.test(agentOutput);
+  } catch {
+    return false;
   }
 }

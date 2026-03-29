@@ -24,22 +24,22 @@ bash
 # 1. Spec & Planning (Architect / Tech Writer Agent picks this up)
 bun run dev work create --id "auth-spec" \
   --title "Draft OpenAPI specification for new JWT auth endpoints" \
-  --project "proj" --priority "P1" --source "local" --source-ref "./projects/proj" \
+  --project "cli-proj" --priority "P1" --source "local" --source-ref "./projects/cli-proj" \
   --skills "architect,planning"
 # 2. Backend Implementation (Backend / Node Agent picks this up once spec exists)
 bun run dev work create --id "auth-backend" \
   --title "Implement JWT authentication API based on OpenAPI spec" \
-  --project "proj" --priority "P1" --source "local" --source-ref "./projects/proj" \
+  --project "cli-proj" --priority "P1" --source "local" --source-ref "./projects/cli-proj" \
   --skills "backend,nodejs"
 # 3. Frontend Integration (Frontend / UI Agent picks this up once API is ready)
 bun run dev work create --id "auth-frontend" \
   --title "Integrate JWT auth into React login page" \
-  --project "proj" --priority "P2" --source "local" --source-ref "./projects/proj" \
+  --project "cli-proj" --priority "P2" --source "local" --source-ref "./projects/cli-proj" \
   --skills "frontend,react"
 # 4. End-to-End Testing (QA / Testing Agent picks this up once UI is ready)
 bun run dev work create --id "auth-qa" \
   --title "Write Cypress E2E tests for the new JWT login flow" \
-  --project "proj" --priority "P2" --source "local" --source-ref "./projects/proj" \
+  --project "cli-proj" --priority "P2" --source "local" --source-ref "./projects/cli-proj" \
   --skills "qa,testing"
 
 Use Case 2: Bug Fix & Documentation Updates
