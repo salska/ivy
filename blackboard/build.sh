@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-BINARY_NAME="ivy-blackboard"
+BINARY_NAME="blackboard"
 DIST_DIR="dist"
 INSTALL_DIR="${HOME}/bin"
 
