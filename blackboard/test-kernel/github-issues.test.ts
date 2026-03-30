@@ -24,7 +24,7 @@ import {
   type ContentFilterResult,
 } from '../src/runtime/evaluators/github-issues.ts';
 import type { ChecklistItem } from '../src/runtime/parser/types.ts';
-import { registerProject } from '../src/kernel/project';
+import { registerProject } from '../src/kernel/project.ts';
 
 function makeItem(overrides: Partial<ChecklistItem> = {}): ChecklistItem {
   return {

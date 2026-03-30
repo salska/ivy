@@ -1,16 +1,16 @@
 #!/usr/bin/env bun
 
 /**
- * ivy — Unified Personal AI Infrastructure CLI
+ * blackboard — Unified Personal AI Infrastructure CLI
  *
- * Merges ivy-blackboard (kernel/SDK) and ivy-heartbeat (runtime/daemon)
+ * Merges blackboard (kernel/SDK) and heartbeat (runtime/daemon)
  * into a single CLI binary. Supports:
  *
  *   - All blackboard commands: work, project, agent, learn, status, sweep
  *   - All heartbeat commands: observe, check, schedule, search, export,
  *     serve, dispatch, dispatch-worker, specflow-queue, kai-manual, skills
  *   - Multi-database "Second Brain" via --attach
- *   - Plugin system via ~/.ivy/plugins/ or --plugin-dir
+ *   - Plugin system via ~/.blackboard/plugins/ or --plugin-dir
  */
 
 import { Command } from 'commander';
@@ -51,19 +51,19 @@ export interface CliContext {
 // ─── Program Definition ──────────────────────────────────────────────
 
 const program = new Command()
-  .name('ivy')
+  .name('blackboard')
   .version('0.2.0')
   .description(
-    'ivy — Unified Personal AI Infrastructure\n\n' +
-    '  Kernel:  ivy-blackboard (SQLite SDK for agents, work items, projects)\n' +
-    '  Runtime: ivy-heartbeat  (scheduling, dispatch, evaluators, plugins)\n\n' +
+    'blackboard — Unified Personal AI Infrastructure\n\n' +
+    '  Kernel:  blackboard (SQLite SDK for agents, work items, projects)\n' +
+    '  Runtime: heartbeat  (scheduling, dispatch, evaluators, plugins)\n\n' +
     '  Use --attach to mount additional "second brain" databases.\n' +
     '  Use --plugin-dir to load custom plugins.'
   )
   .option('-j, --json', 'Output as JSON', false)
   .option('--db <path>', 'Database path (overrides all resolution)')
   .option('--attach <alias=path...>', 'Attach secondary brain databases (repeatable)')
-  .option('--plugin-dir <path>', 'Plugin directory (default: ~/.ivy/plugins)');
+  .option('--plugin-dir <path>', 'Plugin directory (default: ~/.blackboard/plugins)');
 
 let cached: CliContext | null = null;
 
@@ -81,7 +81,7 @@ function getContext(): CliContext {
     const brains = parseAttachFlags(attachArgs);
     for (const { alias, path } of brains) {
       secondBrain.attach(alias, path);
-      console.error(`[ivy] Attached brain "${alias}" from ${path}`);
+      console.error(`[blackboard] Attached brain "${alias}" from ${path}`);
     }
   }
 
@@ -125,7 +125,7 @@ registerSkillsCommand(program, getContext);
 
 async function main() {
   const opts = program.opts();
-  const pluginDir = opts.pluginDir ?? join(homedir(), '.ivy', 'plugins');
+  const pluginDir = opts.pluginDir ?? join(homedir(), '.blackboard', 'plugins');
 
   // Load plugins before parsing commands (they may register custom commands)
   const ctx = getContext();
@@ -147,6 +147,6 @@ async function main() {
 }
 
 main().catch((err) => {
-  console.error(`[ivy] Fatal: ${err instanceof Error ? err.message : String(err)}`);
+  console.error(`[blackboard] Fatal: ${err instanceof Error ? err.message : String(err)}`);
   process.exit(1);
 });

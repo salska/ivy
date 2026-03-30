@@ -1,7 +1,7 @@
 import { Command } from 'commander';
 import type { CliContext } from '../cli.ts';
 import { startUnifiedServer } from '../serve/unified-server.ts';
-import { resolveDbPath } from '../../kernel/db';
+import { resolveDbPath } from '../../kernel/db.ts';
 import { sweepStaleAgents } from '../../kernel/sweep.ts';
 import { dispatch } from '../scheduler/scheduler.ts';
 

@@ -4,8 +4,8 @@ import {
     queryLearnings,
     synthesizeRules,
     buildPromptContext,
-} from '../../kernel/learnings';
-import { formatJson } from '../../kernel/output';
+} from '../../kernel/learnings.ts';
+import { formatJson } from '../../kernel/output.ts';
 
 /**
  * Register learn commands on the unified ivy CLI.

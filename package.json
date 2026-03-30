@@ -1,0 +1,7 @@
+{
+  "name": "ivy-root",
+  "workspaces": [
+    "blackboard",
+    "heartbeat"
+  ]
+}

@@ -3,10 +3,10 @@ import { mkdirSync, rmSync } from 'node:fs';
 import { createTestContext, cleanupTestContext, type TestContext } from './helpers.ts';
 import { dispatch } from '../src/runtime/scheduler/scheduler.ts';
 import { setLauncher, resetLauncher } from '../src/runtime/scheduler/launcher.ts';
-import { registerProject } from '../src/kernel/project';
-import { createWorkItem } from '../src/kernel/work';
+import { registerProject } from '../src/kernel/project.ts';
+import { createWorkItem } from '../src/kernel/work.ts';
 import type { LaunchOptions, LaunchResult, DispatchOptions } from '../src/runtime/scheduler/types.ts';
-import { updateWorkItemMetadata } from '../src/kernel/work';
+import { updateWorkItemMetadata } from '../src/kernel/work.ts';
 
 let ctx: TestContext;
 let launchCalls: LaunchOptions[];

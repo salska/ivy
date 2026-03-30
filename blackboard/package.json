@@ -1,10 +1,14 @@
 {
-  "name": "ivy",
+  "name": "ivy-blackboard",
   "version": "0.3.0",
   "description": "ivy — Unified Personal AI Infrastructure: blackboard kernel + heartbeat runtime with plugin system and multi-brain support",
   "type": "module",
   "main": "src/kernel/kernel.ts",
   "module": "src/kernel/kernel.ts",
+  "exports": {
+    "./src/*": "./src/*.ts",
+    "./src/*/index.ts": "./src/*/index.ts"
+  },
   "bin": {
     "ivy": "src/cli.ts",
     "blackboard": "src/kernel/index.ts"
@@ -43,6 +47,7 @@
   "devDependencies": {
     "@types/bun": "latest",
     "@types/js-yaml": "^4.0.9",
+    "@types/minimatch": "^5.1.2",
     "typescript": "^5.7"
   },
   "peerDependencies": {

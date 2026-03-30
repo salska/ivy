@@ -1,9 +1,9 @@
 import { Command } from 'commander';
 import type { CliContext } from '../cli.ts';
-import { getOverallStatus } from 'ivy-blackboard/src/status';
-import { sweepStaleAgents } from 'ivy-blackboard/src/sweep';
-import { formatJson } from 'ivy-blackboard/src/output';
-import { resolveDbPath } from 'ivy-blackboard/src/db';
+import { getOverallStatus } from 'ivy-blackboard/src/kernel/status';
+import { sweepStaleAgents } from 'ivy-blackboard/src/kernel/sweep';
+import { formatJson } from 'ivy-blackboard/src/kernel/output';
+import { resolveDbPath } from 'ivy-blackboard/src/kernel/db';
 
 /**
  * Register status & sweep commands on the unified ivy CLI.

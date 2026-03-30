@@ -4,12 +4,12 @@ import {
     registerProject,
     listProjects,
     getProjectStatus,
-} from 'ivy-blackboard/src/project';
+} from 'ivy-blackboard/src/kernel/project';
 import {
     formatJson,
     formatTable,
     formatRelativeTime,
-} from 'ivy-blackboard/src/output';
+} from 'ivy-blackboard/src/kernel/output';
 
 /**
  * Register project commands on the unified ivy CLI.
@@ -71,7 +71,7 @@ export function registerProjectCommands(
                     console.log('No projects registered.');
                 } else {
                     const headers = ['ID', 'NAME', 'AGENTS', 'AVAILABLE', 'CLAIMED', 'COMPLETED', 'REGISTERED'];
-                    const rows = projects.map((p) => [
+                    const rows = projects.map((p: any) => [
                         p.project_id,
                         p.display_name,
                         String(p.active_agents),

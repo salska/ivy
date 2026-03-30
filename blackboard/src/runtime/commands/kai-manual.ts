@@ -258,9 +258,10 @@ export function registerKaiManualCommand(
 
                 // Stream stdout and stderr
                 const [stdout, stderr] = await Promise.all([
-                    streamToFileAndTerminal(proc.stdout as ReadableStream<Uint8Array>, transcriptPath),
+                    proc.stdout ? streamToFileAndTerminal(proc.stdout as any, transcriptPath) : Promise.resolve(""),
                     (async () => {
-                        const reader = (proc.stderr as ReadableStream<Uint8Array>).getReader();
+                        const reader = (proc.stderr as any)?.getReader();
+                        if (!reader) return "";
                         const decoder = new TextDecoder();
                         const chunks: string[] = [];
                         while (true) {

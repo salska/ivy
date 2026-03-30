@@ -1,6 +1,8 @@
 import { mkdirSync, openSync, closeSync, appendFileSync } from 'node:fs';
+import { spawn as nodeSpawn } from 'node:child_process';
+import type { Database } from 'bun:sqlite';
 import type { Blackboard } from '../blackboard.ts';
-import type { BlackboardWorkItem } from 'ivy-blackboard/src/types';
+import type { BlackboardWorkItem } from 'ivy-blackboard/src/kernel/types';
 import { getLauncher, resolveLogDir, logPathForSession } from './launcher.ts';
 import { loadAlgorithmTemplate } from '../hooks/pre-session.ts';
 import {
@@ -44,7 +46,7 @@ function resolveWorkerBinary(): string[] {
     return [ep];
   }
   // Running from source: bun run src/cli.ts
-  return ['bun', 'run', `${import.meta.dir}/../cli.ts`];
+  return ['bun', 'run', new URL('../cli.ts', import.meta.url).pathname];
 }
 
 /**
@@ -109,7 +111,7 @@ If you discover that completing this task requires changes in another project:
  * Selects the best-fit persona via bidding, then injects the PAI Hybrid
  * Algorithm template with project-specific learnings.
  */
-function buildPrompt(item: BlackboardWorkItem, sessionId: string, db: import('bun:sqlite').Database): string {
+function buildPrompt(item: BlackboardWorkItem, sessionId: string, db: Database): { prompt: string; personaName: string | null } {
   const persona = selectPersona(item.metadata, item.title, item.description ?? '');
 
   const parts = [
@@ -146,7 +148,7 @@ function buildPrompt(item: BlackboardWorkItem, sessionId: string, db: import('bu
     `\nWhen you are done, summarize what you accomplished.`,
   );
 
-  return parts.join('\n');
+  return { prompt: parts.join('\n'), personaName: persona?.name ?? null };
 }
 
 /**
@@ -325,11 +327,11 @@ export async function dispatch(
 
         const logFd = openSync(logPath, 'a');
         try {
-          const proc = Bun.spawn(args, {
+          const proc = nodeSpawn(args[0]!, args.slice(1), {
             cwd: resolvedWorkDir,
-            stdout: 'ignore',
-            stderr: logFd,
-            stdin: 'ignore',
+            stdio: ['ignore', 'ignore', logFd],
+            env: { ...process.env },
+            detached: true,
           });
           proc.unref();
         } finally {
@@ -477,7 +479,7 @@ export async function dispatch(
         continue;
       }
 
-      const prompt = buildPrompt(item, sessionId, bb.db);
+      const { prompt, personaName: _personaName } = buildPrompt(item, sessionId, bb.db);
 
       // Worktree setup for GitHub items
       const ghMeta = parseGithubMeta(item.metadata);

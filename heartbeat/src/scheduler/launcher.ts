@@ -1,4 +1,5 @@
-import { mkdirSync, appendFileSync } from 'node:fs';
+import { mkdirSync, appendFileSync, readFileSync, existsSync } from 'node:fs';
+import type { Database } from 'bun:sqlite';
 import type { LaunchOptions, LaunchResult, SessionLauncher } from './types.ts';
 
 /**
@@ -15,6 +16,91 @@ export function resolveLogDir(): string {
  */
 export function logPathForSession(sessionId: string): string {
   return `${resolveLogDir()}/${sessionId}.log`;
+}
+
+/**
+ * Retrieve the tail of the log file for the most recent crashed/abandoned agent
+ * that was working on this item. Useful for prompt context recovery.
+ */
+export function getPreviousAgentLogs(db: Database, itemId: string, currentSessionId: string): string | null {
+  try {
+    const row = db.query(`
+      SELECT actor_id as session_id
+      FROM events
+      WHERE event_type = 'work_claimed' AND target_id = ? AND actor_id != ?
+      ORDER BY timestamp DESC
+      LIMIT 1
+    `).get(itemId, currentSessionId) as { session_id: string } | null;
+
+    if (!row) return null;
+
+    const logPath = logPathForSession(row.session_id);
+    if (!existsSync(logPath)) return null;
+
+    const content = readFileSync(logPath, 'utf-8');
+    const lines = content.split('\n');
+    const tailLimit = 150;
+    const tailLines = lines.length > tailLimit ? lines.slice(-tailLimit) : lines;
+    
+    const logs = tailLines.join('\n').trim();
+    return logs || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Check if a session log contains evidence of tool usage.
+ */
+export function hasToolUsage(sessionId: string): boolean {
+  try {
+    const logPath = logPathForSession(sessionId);
+    if (!existsSync(logPath)) return true; // fail open
+    
+    const content = readFileSync(logPath, 'utf-8');
+    const parts = content.split('\n===\n');
+    if (parts.length < 2) return true;
+    const agentOutput = parts.slice(1).join('\n===\n');
+
+    const patterns = [
+      /\[tool\]/i,
+      /<\/tool>/i,
+      /PHASE_REPORT:/i,
+      /HANDOVER_CONTEXT:/i,
+      /--- RESULT ---/i
+    ];
+
+    if (!patterns.some(p => p.test(agentOutput))) return false;
+
+    return (
+      hasActionUsage(sessionId) || 
+      /PHASE_REPORT:|HANDOVER_CONTEXT:/i.test(agentOutput)
+    );
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * Check if a session log contains evidence of ACTION tool usage.
+ */
+export function hasActionUsage(sessionId: string): boolean {
+  try {
+    const logPath = logPathForSession(sessionId);
+    if (!existsSync(logPath)) return false;
+
+    const content = readFileSync(logPath, 'utf-8');
+    const parts = content.split('\n===\n');
+    if (parts.length < 2) return false;
+    const agentOutput = parts.slice(1).join('\n===\n');
+
+    const actionPattern = /\[tool\] (Write|Edit|TodoWrite|Bash|RunCommand|supertag (create|edit|set-field|tag|done|undone|trash))/i;
+    const genericToolPattern = /\[tool\] (?!(Glob|Read|Search|ls|Help|TanaSearch|nodes show|tags list|tags show|query))/i;
+
+    return actionPattern.test(agentOutput) || genericToolPattern.test(agentOutput);
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -248,8 +334,8 @@ async function defaultLauncher(opts: LaunchOptions): Promise<LaunchResult> {
 
   // Stream stdout (JSON) and stderr to log file in parallel
   const [stdout, stderr] = await Promise.all([
-    streamJsonToLog(proc.stdout as ReadableStream<Uint8Array>, logPath),
-    streamStderrToLog(proc.stderr as ReadableStream<Uint8Array>, logPath),
+    proc.stdout ? streamJsonToLog(proc.stdout as any, logPath) : Promise.resolve(""),
+    proc.stderr ? streamStderrToLog(proc.stderr as any, logPath) : Promise.resolve(""),
   ]);
 
   const exitCode = await proc.exited;

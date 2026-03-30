@@ -4,8 +4,8 @@ import {
     queryLearnings,
     synthesizeRules,
     buildPromptContext,
-} from 'ivy-blackboard/src/learnings';
-import { formatJson } from 'ivy-blackboard/src/output';
+} from 'ivy-blackboard/src/kernel/learnings';
+import { formatJson } from 'ivy-blackboard/src/kernel/output';
 
 /**
  * Register learn commands on the unified ivy CLI.

@@ -12,8 +12,8 @@ import {
   createMergeFixWorkItem,
   type MergeFixMetadata,
 } from '../src/runtime/scheduler/merge-fix.ts';
-import { registerProject } from '../src/kernel/project';
-import { createWorkItem } from '../src/kernel/work';
+import { registerProject } from '../src/kernel/project.ts';
+import { createWorkItem } from '../src/kernel/work.ts';
 
 let ctx: TestContext;
 

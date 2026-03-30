@@ -1,6 +1,7 @@
 import { mkdirSync, openSync, closeSync, appendFileSync } from 'node:fs';
+import { spawn as nodeSpawn } from 'node:child_process';
 import type { Blackboard } from '../blackboard.ts';
-import type { BlackboardWorkItem } from '../../kernel/types';
+import type { BlackboardWorkItem } from '../../kernel/types.ts';
 import { getLauncher, resolveLogDir, logPathForSession, hasToolUsage, hasActionUsage } from './launcher.ts';
 import { isMeaninglessHandover, parsePhaseReport } from '../parser/handover-parser.ts';
 import { loadAlgorithmTemplate } from '../hooks/pre-session.ts';
@@ -432,12 +433,11 @@ export async function dispatch(
 
         const logFd = openSync(logPath, 'a');
         try {
-          const proc = Bun.spawn(args, {
+          const proc = nodeSpawn(args[0]!, args.slice(1), {
             cwd: resolvedWorkDir,
-            stdout: 'ignore',
-            stderr: logFd,
-            stdin: 'ignore',
+            stdio: ['ignore', 'ignore', logFd],
             env: process.env, // explicitly forward environment variables
+            detached: true,
           });
           proc.unref();
         } finally {
@@ -883,14 +883,14 @@ export async function dispatch(
                 reason: 'Agent requested handover to next persona on success',
                 actorId: personaName ?? sessionId,
               });
-              
+
               didHandover = true;
             }
           } catch { /* ignore parsing/fs errors */ }
 
           if (didHandover) {
             bb.deregisterAgent(sessionId);
-            
+
             result.dispatched.push({
               itemId: item.item_id,
               title: item.title,
@@ -915,8 +915,8 @@ export async function dispatch(
           const hasDiskChanges = !isWorkingTreeClean;
 
           // Strict check for build tasks: must have actions unless it's a handover or completed report.
-          const isBuildTask = resolvedWorkDir.endsWith('cli-proj') || 
-                              /build|create|implement|add|fix|update|draft|spec/i.test(item.title);
+          const isBuildTask = resolvedWorkDir.endsWith('cli-proj') ||
+            /build|create|implement|add|fix|update|draft|spec/i.test(item.title);
 
           if (!hasTools && !didHandover && !report.completed && !hasDiskChanges) {
             bb.appendEvent({

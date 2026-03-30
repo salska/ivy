@@ -1,4 +1,5 @@
 import { Command } from 'commander';
+import { readFileSync, existsSync } from 'node:fs';
 import type { CliContext } from '../cli.ts';
 import { getLauncher, logPathForSession, hasToolUsage, hasActionUsage, getPreviousAgentLogs } from '../scheduler/launcher.ts';
 import { loadAlgorithmTemplate } from '../hooks/pre-session.ts';
@@ -22,7 +23,6 @@ import { runSpecFlowPhase } from '../scheduler/specflow-runner.ts';
 import { parseMergeFixMeta, createMergeFixWorkItem, runMergeFix } from '../scheduler/merge-fix.ts';
 import { getTanaAccessor } from '../evaluators/tana-accessor.ts';
 import { selectPersona } from '../scheduler/persona-loader.ts';
-import { updateWorkItemMetadata, handoverWorkItem } from '../../kernel/work.ts';
 import { createSnapshot } from '../../kernel/snapshot.ts';
 import { isMeaninglessHandover, parsePhaseReport } from '../parser/handover-parser.ts';
 
@@ -215,11 +215,11 @@ function buildPrompt(
   description: string | null,
   itemId: string,
   sessionId: string,
-  db: import('bun:sqlite').Database,
+  db: CliContext['bb']['db'],
   projectId?: string,
   metadata?: string | null,
   handoverContext?: string | null
-): { prompt: string; personaName: string | null } {
+): { prompt: string; personaName: string | null; missingSkills: string[] } {
   // Extract failed_by list to exclude stagnated personas from selection
   let excludePersonas: string[] = [];
   if (metadata) {
@@ -272,21 +272,23 @@ function buildPrompt(
   }
 
   // Inject requested PAI Skills
+  const missingSkills: string[] = [];
   if (metadata) {
     try {
       const parsed = JSON.parse(metadata);
       if (parsed.skills && Array.isArray(parsed.skills)) {
-        const skillContext = buildSkillContext(parsed.skills);
-        if (skillContext) {
-          parts.push(`\n## Requested Skills\n\nThe following skills have been injected into your context for this task:\n\n${skillContext}\n`);
-          console.log(`[skills] Injected skills for work item "${title}": ${parsed.skills.join(', ')}`);
+        try {
+          const skillContext = buildSkillContext(parsed.skills);
+          if (skillContext) {
+            parts.push(`\n## Requested Skills\n\nThe following skills have been injected into your context for this task:\n\n${skillContext}\n`);
+            console.log(`[skills] Injected skills for work item "${title}": ${parsed.skills.join(', ')}`);
+          }
+        } catch (skillErr) {
+          missingSkills.push(...parsed.skills);
+          console.warn(`[skills] Failed to load skill context for "${title}": ${skillErr instanceof Error ? skillErr.message : String(skillErr)}`);
         }
       }
-    } catch (err) {
-      // Non-fatal: just ignore bad metadata or missing skills
-      const msg = err instanceof Error ? err.message : String(err);
-      console.error(`[skills] Failed to load skill context: ${msg}`);
-    }
+    } catch { /* ignore bad JSON */ }
   }
 
   // Inject handover context from previous agent if present
@@ -328,13 +330,8 @@ function buildPrompt(
     `Do not wrap this in a code block unless necessary.`
   );
 
-  return { prompt: parts.join('\n'), personaName: persona?.name ?? null };
+  return { prompt: parts.join('\n'), personaName: persona?.name ?? null, missingSkills };
 }
-
-/**
- * Parse the PHASE_REPORT block from agent output.
- * Returns the last phase reached and any facts learned.
- */
 
 /**
  * Hidden dispatch-worker subcommand.
@@ -511,19 +508,35 @@ export function registerDispatchWorkerCommand(
         }
       }
 
-      const { prompt, personaName } = buildPrompt(item.title, item.description, itemId, sessionId, bb.db, item.project_id ?? undefined, item.metadata, item.handover_context);
+      const { prompt, personaName, missingSkills } = buildPrompt(
+        item.title,
+        item.description,
+        itemId,
+        sessionId,
+        bb.db,
+        item.project_id ?? undefined,
+        item.metadata,
+        item.handover_context
+      );
+
+      if (missingSkills.length > 0) {
+        bb.appendEvent({
+          actorId: sessionId,
+          targetId: itemId,
+          summary: `Warning: requested skills were not found: ${missingSkills.join(', ')}`,
+          metadata: { missingSkills },
+        });
+      }
 
       // Write selected persona back to work item metadata so the dashboard can display it
       if (personaName) {
-        try {
-          updateWorkItemMetadata(bb.db, itemId, { agent_persona: personaName });
-        } catch {
-          // Non-fatal: best effort metadata update
-        }
+        bb.updateWorkItemMetadata(itemId, {
+          agent_persona: personaName,
+        });
       }
 
       // Validate that the resolved work directory actually exists
-      if (!require('node:fs').existsSync(resolvedWorkDir)) {
+      if (!existsSync(resolvedWorkDir)) {
         const msg = `Project directory does not exist: ${resolvedWorkDir}`;
         bb.appendEvent({
           actorId: sessionId,
@@ -531,7 +544,11 @@ export function registerDispatchWorkerCommand(
           summary: `Dispatch worker failed: ${msg}`,
           metadata: { error: msg, missingDir: resolvedWorkDir },
         });
-        try { bb.releaseWorkItem(itemId, sessionId, { reason: msg, noProgress: true, actorId: personaName ?? sessionId }); } catch { /* best effort */ }
+        try {
+          bb.releaseWorkItem(itemId, sessionId);
+          bb.updateWorkItemMetadata(itemId, { last_error: msg });
+        } catch { /* best effort */ }
+        
         try { bb.deregisterAgent(sessionId); } catch { /* best effort */ }
         process.exit(1);
       }
@@ -779,7 +796,6 @@ export function registerDispatchWorkerCommand(
           // counts as meaningful work (especially for researchers/architects).
           let didHandover = false;
           try {
-            const { readFileSync } = require('node:fs');
             const logContent = readFileSync(logPathForSession(sessionId), 'utf-8');
 
             // Support: HANDOVER_CONTEXT:, ### Handover Context, **HANDOVER_CONTEXT:**
@@ -828,10 +844,8 @@ export function registerDispatchWorkerCommand(
                 metadata: { handover: true, exitCode: 0 },
               });
 
-              bb.releaseWorkItem(itemId, sessionId, {
-                reason: 'Agent requested handover to next persona on success',
-                actorId: personaName ?? sessionId,
-              });
+              bb.releaseWorkItem(itemId, sessionId);
+              bb.appendEvent({ actorId: sessionId, targetId: itemId, summary: 'Agent requested handover on success' });
               
               didHandover = true;
             }
@@ -861,13 +875,11 @@ export function registerDispatchWorkerCommand(
               summary: `Agent exited 0 but did no meaningful work for "${item.title}" — releasing as no-progress`,
               metadata: { itemId, exitCode: 0, durationMs, noWorkDetected: true, lastPhase: report.lastPhase },
             });
-            try {
-              bb.releaseWorkItem(itemId, sessionId, {
-                reason,
-                noProgress: true,
-                actorId: personaName ?? sessionId,
-              });
+            try { 
+              bb.releaseWorkItem(itemId, sessionId);
+              bb.updateWorkItemMetadata(itemId, { no_progress: true });
             } catch { /* best effort */ }
+            
             bb.deregisterAgent(sessionId);
             return;
           }
@@ -880,13 +892,11 @@ export function registerDispatchWorkerCommand(
               summary: `Agent claimed completion for build task "${item.title}" but used no action tools — releasing as no-progress`,
               metadata: { itemId, exitCode: 0, durationMs, simulatedWorkDetected: true, lastPhase: report.lastPhase },
             });
-            try {
-              bb.releaseWorkItem(itemId, sessionId, {
-                reason,
-                noProgress: true,
-                actorId: personaName ?? sessionId,
-              });
+            try { 
+              bb.releaseWorkItem(itemId, sessionId);
+              bb.updateWorkItemMetadata(itemId, { no_progress: true });
             } catch { /* best effort */ }
+            
             bb.deregisterAgent(sessionId);
             return;
           }
@@ -969,7 +979,6 @@ export function registerDispatchWorkerCommand(
 
           // Phase 1: Check for handover context in agent output
           try {
-            const { readFileSync } = require('node:fs');
             const logContent = readFileSync(logPathForSession(sessionId), 'utf-8');
             const regex = /(?:###?\s*|\*\*?)?HANDOVER_CONTEXT[:\s*]*\n([\s\S]*?)(?:(?:\r?\n){2,}|```|$|#)/gi;
             const matches = [...logContent.matchAll(regex)];
@@ -1024,7 +1033,10 @@ export function registerDispatchWorkerCommand(
         const msg = err instanceof Error ? err.message : String(err);
         const durationMs = Date.now() - startTime;
 
-        try { bb.releaseWorkItem(itemId, sessionId, { reason: msg, noProgress: true, actorId: personaName ?? sessionId }); } catch { /* best effort */ }
+        try { 
+          bb.releaseWorkItem(itemId, sessionId);
+          bb.updateWorkItemMetadata(itemId, { last_error: msg, no_progress: true });
+        } catch { /* best effort */ }
 
         bb.appendEvent({
           actorId: sessionId,
@@ -1068,5 +1080,3 @@ export function registerDispatchWorkerCommand(
       }
     });
 }
-
-

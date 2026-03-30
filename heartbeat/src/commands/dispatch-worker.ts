@@ -1,6 +1,7 @@
 import { Command } from 'commander';
+import { readFileSync, existsSync } from 'node:fs';
 import type { CliContext } from '../cli.ts';
-import { getLauncher, logPathForSession } from '../scheduler/launcher.ts';
+import { getLauncher, logPathForSession, hasToolUsage, hasActionUsage, getPreviousAgentLogs } from '../scheduler/launcher.ts';
 import { loadAlgorithmTemplate } from '../hooks/pre-session.ts';
 import {
   stashIfDirty,
@@ -22,6 +23,17 @@ import { runSpecFlowPhase } from '../scheduler/specflow-runner.ts';
 import { parseMergeFixMeta, createMergeFixWorkItem, runMergeFix } from '../scheduler/merge-fix.ts';
 import { getTanaAccessor } from '../evaluators/tana-accessor.ts';
 import { selectPersona } from '../scheduler/persona-loader.ts';
+import { createSnapshot } from 'ivy-blackboard/src/kernel/snapshot';
+import { buildSkillContext } from '../skills.ts';
+
+/**
+ * Check if handover summary contains meaningful progress.
+ */
+export function isMeaninglessHandover(text: string): boolean {
+  if (!text) return true;
+  const t = text.toLowerCase();
+  return t === 'not specified' || t === 'none' || t.includes('placeholder') || t.length < 5;
+}
 
 /**
  * Parse work item metadata to extract GitHub-specific fields.
@@ -184,8 +196,6 @@ supertag trash <nodeId>
 - The local API commands (edit, set-field, tag, done) require Tana Desktop to be running
 `;
 
-import { buildSkillContext } from '../skills.ts';
-
 /**
  * Build the prompt for a Claude Code session working on a work item.
  * No git instructions — the dispatch worker handles all git operations.
@@ -197,21 +207,23 @@ function buildPrompt(
   description: string | null,
   itemId: string,
   sessionId: string,
-  db: import('bun:sqlite').Database,
+  db: CliContext['bb']['db'],
   projectId?: string,
-  metadata?: string | null
-): string {
-  const persona = selectPersona(metadata ?? null, title, description ?? '');
-
-  // Update original metadata to include the selected persona so the UI can render it later
-  if (persona) {
+  metadata?: string | null,
+  handoverContext?: string | null
+): { prompt: string; personaName: string | null; missingSkills: string[] } {
+  // Extract failed_by list to exclude stagnated personas from selection
+  let excludePersonas: string[] = [];
+  if (metadata) {
     try {
-      const parsed = metadata ? JSON.parse(metadata) : {};
-      parsed.agent_persona = persona.name;
-      db.prepare(`UPDATE work_items SET metadata = $metadata WHERE item_id = $id`)
-        .run({ $metadata: JSON.stringify(parsed), $id: itemId });
-    } catch { } // ignore
+      const parsed = JSON.parse(metadata);
+      if (Array.isArray(parsed.failed_by)) {
+        excludePersonas = parsed.failed_by;
+      }
+    } catch { /* ignore */ }
   }
+
+  const persona = selectPersona(metadata ?? null, title, description ?? '', excludePersonas);
 
   const parts = [
     persona
@@ -244,29 +256,53 @@ function buildPrompt(
   }
 
   // Inject requested PAI Skills
+  const missingSkills: string[] = [];
   if (metadata) {
     try {
       const parsed = JSON.parse(metadata);
       if (parsed.skills && Array.isArray(parsed.skills)) {
-        const skillContext = buildSkillContext(parsed.skills);
-        if (skillContext) {
-          parts.push(`\n## Requested Skills\n\nThe following skills have been injected into your context for this task:\n\n${skillContext}\n`);
-          console.log(`[skills] Injected skills for work item "${title}": ${parsed.skills.join(', ')}`);
+        try {
+          const skillContext = buildSkillContext(parsed.skills);
+          if (skillContext) {
+            parts.push(`\n## Requested Skills\n\nThe following skills have been injected into your context for this task:\n\n${skillContext}\n`);
+            console.log(`[skills] Injected skills for work item "${title}": ${parsed.skills.join(', ')}`);
+          }
+        } catch (skillErr) {
+          missingSkills.push(...parsed.skills);
+          console.warn(`[skills] Failed to load skill context for "${title}": ${skillErr instanceof Error ? skillErr.message : String(skillErr)}`);
         }
       }
-    } catch (err) {
-      // Non-fatal: just ignore bad metadata or missing skills
-      const msg = err instanceof Error ? err.message : String(err);
-      console.error(`[skills] Failed to load skill context: ${msg}`);
+    } catch { /* ignore bad JSON */ }
+  }
+
+  // Inject handover context from previous agent if present
+  if (handoverContext) {
+    try {
+      const handover = JSON.parse(handoverContext);
+      parts.push(
+        `\n## Handover Context (from previous agent)\n`,
+        `The previous agent handed this task over with the following context:`,
+        `- **Progress:** ${handover.progress ?? 'Not specified'}`,
+        `- **Next Steps:** ${handover.next_steps ?? 'Not specified'}`,
+        handover.blockers ? `- **Blockers:** ${handover.blockers}` : '',
+        handover.notes ? `- **Notes:** ${handover.notes}` : '',
+        `\nPlease continue from where the previous agent left off.\n`,
+      );
+    } catch {
+      parts.push(`\n## Handover Context\n\n${handoverContext}\n`);
     }
   }
 
   parts.push(
     TOOL_HINTS,
-    `\nWhen you are done, summarize what you accomplished.`
+    `\nWhen you are done, summarize what you accomplished.`,
+    `If you cannot complete the task and need to hand it off, output a string exactly starting with HANDOVER_CONTEXT: on its own line.`,
+    `Below that line, provide three fields: progress:, next_steps:, and blockers: (if any).`,
+    `Make sure the values for these fields are on the same line as the key or on following lines.`,
+    `Do not wrap this in a code block unless necessary.`
   );
 
-  return parts.join('\n');
+  return { prompt: parts.join('\n'), personaName: persona?.name ?? null, missingSkills };
 }
 
 /**
@@ -281,12 +317,13 @@ function parsePhaseReport(logPath: string): {
 } {
   const defaults = { lastPhase: 'unknown', completed: false, factsLearned: [], iscMet: 'unknown' };
   try {
-    const { readFileSync } = require('node:fs');
     const content = readFileSync(logPath, 'utf-8');
     const match = content.match(/PHASE_REPORT:\s*\n([\s\S]*?)(?:```|$)/);
     if (!match) return defaults;
 
     const block = match[1];
+    if (!block) return defaults;
+
     const phaseMatch = block.match(/last_phase:\s*(\w+)/);
     const completedMatch = block.match(/completed:\s*(true|false)/);
     const iscMatch = block.match(/isc_met:\s*(\w+)/);
@@ -294,7 +331,7 @@ function parsePhaseReport(logPath: string): {
     // Extract facts_learned list items
     const factsSection = block.match(/facts_learned:\s*\n((?:\s+-\s+.+\n?)*)/);
     const factsLearned: string[] = [];
-    if (factsSection) {
+    if (factsSection?.[1]) {
       const factLines = factsSection[1].match(/^\s+-\s+(.+)$/gm);
       if (factLines) {
         for (const line of factLines) {
@@ -489,7 +526,32 @@ export function registerDispatchWorkerCommand(
         }
       }
 
-      const prompt = buildPrompt(item.title, item.description, itemId, sessionId, bb.db, item.project_id ?? undefined, item.metadata);
+      const { prompt, personaName, missingSkills } = buildPrompt(
+        item.title,
+        item.description,
+        itemId,
+        sessionId,
+        bb.db,
+        item.project_id ?? undefined,
+        item.metadata,
+        item.handover_context
+      );
+
+      // Write selected persona back to work item metadata
+      if (personaName) {
+        bb.updateWorkItemMetadata(itemId, {
+          agent_persona: personaName,
+        });
+      }
+
+      if (missingSkills.length > 0) {
+        bb.appendEvent({
+          actorId: sessionId,
+          targetId: itemId,
+          summary: `Warning: requested skills were not found: ${missingSkills.join(', ')}`,
+          metadata: { missingSkills },
+        });
+      }
       const startTime = Date.now();
 
       bb.appendEvent({
@@ -700,7 +762,7 @@ export function registerDispatchWorkerCommand(
           if (tanaMeta.isTana && tanaMeta.nodeId) {
             try {
               const tanaAccessor = getTanaAccessor();
-              const resultContent = `- ✅ Ivy completed this task\n  - **Result:** Completed "${item.title}"\n  - **Completed:** ${new Date().toISOString()}`;
+              const resultContent = `- ✅ Blackboard completed this task\n  - **Result:** Completed "${item.title}"\n  - **Completed:** ${new Date().toISOString()}`;
               await tanaAccessor.addChildContent(tanaMeta.nodeId, resultContent);
               await tanaAccessor.checkNode(tanaMeta.nodeId);
               bb.appendEvent({
@@ -762,7 +824,7 @@ export function registerDispatchWorkerCommand(
           if (tanaMeta.isTana && tanaMeta.nodeId) {
             try {
               const tanaAccessor = getTanaAccessor();
-              const errorContent = `- ❌ Ivy encountered an error\n  - **Error:** Agent exited with code ${result.exitCode}\n  - **Attempted:** ${new Date().toISOString()}\n  - **Status:** Task left pending for retry or manual action`;
+              const errorContent = `- ❌ Blackboard encountered an error\n  - **Error:** Agent exited with code ${result.exitCode}\n  - **Attempted:** ${new Date().toISOString()}\n  - **Status:** Task left pending for retry or manual action`;
               await tanaAccessor.addChildContent(tanaMeta.nodeId, errorContent);
               // Do NOT check off the node — leave it unchecked for retry
               bb.appendEvent({
@@ -843,5 +905,3 @@ export function registerDispatchWorkerCommand(
       }
     });
 }
-
-

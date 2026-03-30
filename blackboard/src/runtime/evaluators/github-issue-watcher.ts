@@ -1,7 +1,7 @@
 import type { ChecklistItem } from '../parser/types.ts';
 import type { CheckResult } from '../check/types.ts';
 import type { Blackboard } from '../blackboard.ts';
-import type { BlackboardWorkItem } from '../../kernel/types';
+import type { BlackboardWorkItem } from '../../kernel/types.ts';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 

@@ -4,7 +4,7 @@ import {
   formatJson,
   formatTable,
   formatRelativeTime,
-} from '../../kernel/output';
+} from '../../kernel/output.ts';
 
 export function registerSearchCommand(
   parent: Command,

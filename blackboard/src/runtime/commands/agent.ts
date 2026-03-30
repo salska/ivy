@@ -1,11 +1,11 @@
 import { Command } from 'commander';
 import type { CliContext } from '../cli.ts';
-import { listAgents } from '../../kernel/agent';
+import { listAgents } from '../../kernel/agent.ts';
 import {
   formatJson,
   formatTable,
   formatRelativeTime,
-} from '../../kernel/output';
+} from '../../kernel/output.ts';
 
 export function registerAgentCommands(
   parent: Command,

@@ -1,7 +1,7 @@
 import { Command } from "commander";
 import type { CliContext } from "../cli.ts";
 import { listSkills, buildSkillContext } from "../skills.ts";
-import { formatJson } from "../../kernel/output";
+import { formatJson } from "../../kernel/output.ts";
 
 export function registerSkillsCommand(
     parent: Command,

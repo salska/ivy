@@ -1,7 +1,7 @@
 import { Command } from 'commander';
 import type { CliContext } from '../cli.ts';
 import { runChecks } from '../check/runner.ts';
-import { formatJson } from '../../kernel/output';
+import { formatJson } from '../../kernel/output.ts';
 import type { CheckResult, CheckSummary, DueCheckResult } from '../check/types.ts';
 
 export function registerCheckCommand(

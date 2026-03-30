@@ -1,7 +1,7 @@
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { createTestContext, cleanupTestContext, type TestContext } from './helpers.ts';
-import { registerProject } from '../src/kernel/project';
+import { registerProject } from '../src/kernel/project.ts';
 import {
   runSpecFlowPhase,
   setSpecFlowSpawner,
@@ -13,7 +13,7 @@ import {
 } from '../src/runtime/scheduler/specflow-runner.ts';
 import { setLauncher, resetLauncher } from '../src/runtime/scheduler/launcher.ts';
 import type { SpecFlowWorkItemMetadata } from '../src/runtime/scheduler/specflow-types.ts';
-import type { BlackboardWorkItem } from '../src/kernel/types';
+import type { BlackboardWorkItem } from '../src/kernel/types.ts';
 
 // ─── Helpers ──────────────────────────────────────────────────────────
 

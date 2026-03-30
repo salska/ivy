@@ -1,7 +1,7 @@
 import { Command } from "commander";
 import type { CliContext } from "../cli.ts";
 import { listSkills, buildSkillContext } from "../skills.ts";
-import { formatJson } from "ivy-blackboard/src/output";
+import { formatJson } from "ivy-blackboard/src/kernel/output";
 
 export function registerSkillsCommand(
     parent: Command,

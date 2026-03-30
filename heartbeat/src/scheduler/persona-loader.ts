@@ -274,7 +274,8 @@ export function scoreBid(
 export function selectPersona(
     metadata: string | null,
     title: string,
-    description: string
+    description: string,
+    exclude: string[] = []
 ): PersonaBlock | null {
     // 1. Explicit override from metadata
     if (metadata) {
@@ -289,9 +290,13 @@ export function selectPersona(
     }
 
     // 2. Run bidding
-    const candidates = loadAllDispatchable();
+    let candidates = loadAllDispatchable();
     if (candidates.length === 0) {
         return loadPersona(DEFAULT_PERSONA);
+    }
+
+    if (exclude.length > 0) {
+        candidates = candidates.filter(p => !exclude.includes(p.name));
     }
 
     const scored = candidates.map(p => ({

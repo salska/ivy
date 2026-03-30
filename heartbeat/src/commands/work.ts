@@ -13,12 +13,12 @@ import {
     deleteWorkItem,
     updateWorkItemMetadata,
     appendWorkItemEvent,
-} from 'ivy-blackboard/src/work';
+} from 'ivy-blackboard/src/kernel/work';
 import {
     formatJson,
     formatTable,
     formatRelativeTime,
-} from 'ivy-blackboard/src/output';
+} from 'ivy-blackboard/src/kernel/output';
 
 /**
  * Register work-item commands on the unified ivy CLI.
@@ -283,7 +283,7 @@ export function registerWorkCommands(
                     console.log('No work items.');
                 } else {
                     const headers = ['ID', 'TITLE', 'PROJECT', 'STATUS', 'PRIORITY', 'CLAIMED BY', 'CREATED'];
-                    const rows = items.map((i) => [
+                    const rows = items.map((i: any) => [
                         i.item_id.slice(0, 12),
                         i.title,
                         i.project_id ?? '-',

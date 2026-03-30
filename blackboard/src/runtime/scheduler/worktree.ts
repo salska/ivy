@@ -1,5 +1,5 @@
 import { mkdirSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, dirname, basename } from 'node:path';
 
 export interface WorktreeContext {
   projectPath: string;    // main repo
@@ -24,11 +24,12 @@ async function git(args: string[], cwd: string): Promise<string> {
     cwd,
     stdout: 'pipe',
     stderr: 'pipe',
+    env: { ...process.env },
   });
 
   const [stdout, stderr] = await Promise.all([
-    new Response(proc.stdout).text(),
-    new Response(proc.stderr).text(),
+    proc.stdout ? new Response(proc.stdout as any).text() : Promise.resolve(""),
+    proc.stderr ? new Response(proc.stderr as any).text() : Promise.resolve(""),
   ]);
   const exitCode = await proc.exited;
 
@@ -48,11 +49,12 @@ async function gh(args: string[], cwd: string): Promise<string> {
     cwd,
     stdout: 'pipe',
     stderr: 'pipe',
+    env: { ...process.env },
   });
 
   const [stdout, stderr] = await Promise.all([
-    new Response(proc.stdout).text(),
-    new Response(proc.stderr).text(),
+    proc.stdout ? new Response(proc.stdout as any).text() : Promise.resolve(""),
+    proc.stderr ? new Response(proc.stderr as any).text() : Promise.resolve(""),
   ]);
   const exitCode = await proc.exited;
 
@@ -76,7 +78,7 @@ function worktreeBaseDir(): string {
  * Matches the path derivation used by createWorktree().
  */
 export function resolveWorktreePath(projectPath: string, branch: string, projectId?: string): string {
-  const dirName = projectId ?? projectPath.split('/').pop() ?? 'unknown';
+  const dirName = projectId || basename(projectPath) || 'unknown';
   return join(worktreeBaseDir(), dirName, branch);
 }
 
@@ -136,7 +138,7 @@ export async function createWorktree(
   branch: string,
   projectId?: string
 ): Promise<string> {
-  const dirName = projectId ?? projectPath.split('/').pop() ?? 'unknown';
+  const dirName = projectId || basename(projectPath) || 'unknown';
   const worktreePath = join(worktreeBaseDir(), dirName, branch);
 
   // Ensure parent directory exists
@@ -229,7 +231,6 @@ export async function ensureWorktree(
   }
 
   // Ensure parent directory exists
-  const { dirname } = await import('node:path');
   mkdirSync(dirname(worktreePath), { recursive: true });
 
   // Try to create with existing branch first (may exist from prior phase)

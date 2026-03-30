@@ -1,7 +1,7 @@
 import { Command } from 'commander';
 import type { CliContext } from '../cli.ts';
 import { dispatch } from '../scheduler/scheduler.ts';
-import { formatJson } from '../../kernel/output';
+import { formatJson } from '../../kernel/output.ts';
 import type { DispatchResult } from '../scheduler/types.ts';
 
 export function registerDispatchCommand(

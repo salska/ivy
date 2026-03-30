@@ -1,6 +1,6 @@
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 import { createTestContext, cleanupTestContext, type TestContext } from './helpers.ts';
-import { listAgents } from '../src/kernel/agent';
+import { listAgents } from '../src/kernel/agent.ts';
 
 /**
  * CLI tests exercise the Blackboard class methods that the CLI commands delegate to.

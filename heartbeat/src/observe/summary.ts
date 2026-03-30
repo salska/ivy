@@ -84,7 +84,7 @@ export function generateSummary(bb: Blackboard): ObserveSummary {
       name: item.name,
       status: current?.status ?? (item.enabled ? 'pending' : 'disabled'),
       time: current?.time ?? null,
-      interval_minutes: item.interval_minutes,
+      interval_minutes: (item.config?.interval_minutes as number) ?? 60,
       enabled: item.enabled,
       severity: item.severity,
     });

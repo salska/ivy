@@ -1,7 +1,7 @@
 import { Command } from 'commander';
 import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import type { CliContext } from '../cli.ts';
-import { formatJson } from '../../kernel/output';
+import { formatJson } from '../../kernel/output.ts';
 import {
   generatePlist,
   isCompiledBinary,

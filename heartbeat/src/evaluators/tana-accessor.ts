@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import type { TanaAccessor, TanaNode, TanaNodeContent } from './tana-types.ts';
 
 // ─── Tana local API client (http://localhost:8262) ───────────────────────
@@ -19,8 +20,7 @@ let cachedBearerToken: string | null = null;
 function getBearerToken(): string {
   if (cachedBearerToken) return cachedBearerToken;
   try {
-    const fs = require('node:fs');
-    const raw = fs.readFileSync(CONFIG_PATH, 'utf-8');
+    const raw = readFileSync(CONFIG_PATH, 'utf-8');
     const config = JSON.parse(raw);
     const token = config.localApi?.bearerToken ?? config.bearerToken ?? '';
     if (!token) throw new Error('No bearer token found in supertag config');

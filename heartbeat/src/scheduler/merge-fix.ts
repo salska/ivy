@@ -1,5 +1,5 @@
 import type { Blackboard } from '../blackboard.ts';
-import type { BlackboardProject, BlackboardWorkItem } from 'ivy-blackboard/src/types';
+import type { BlackboardProject, BlackboardWorkItem } from 'ivy-blackboard/src/kernel/types';
 import type { SessionLauncher } from './types.ts';
 import {
   ensureWorktree,
@@ -237,10 +237,11 @@ async function mergeMainIntoWorktree(
       cwd: worktreePath,
       stdout: 'pipe',
       stderr: 'pipe',
+      env: { ...process.env },
     });
     const [stdout, stderr] = await Promise.all([
-      new Response(proc.stdout).text(),
-      new Response(proc.stderr).text(),
+      proc.stdout ? new Response(proc.stdout as any).text() : Promise.resolve(""),
+      proc.stderr ? new Response(proc.stderr as any).text() : Promise.resolve(""),
     ]);
     const exitCode = await proc.exited;
     if (exitCode !== 0) {

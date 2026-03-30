@@ -4,7 +4,7 @@ import {
   formatJson,
   formatTable,
   formatRelativeTime,
-} from 'ivy-blackboard/src/output';
+} from 'ivy-blackboard/src/kernel/output';
 
 export function registerSearchCommand(
   parent: Command,

@@ -1,7 +1,7 @@
 import { Command } from 'commander';
 import type { CliContext } from '../cli.ts';
 import { collectDailyEvents, generateDailyLog } from '../export/daily-log.ts';
-import { formatJson } from '../../kernel/output';
+import { formatJson } from '../../kernel/output.ts';
 
 export function registerExportCommand(
   parent: Command,

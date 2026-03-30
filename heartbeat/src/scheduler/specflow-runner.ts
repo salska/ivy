@@ -8,7 +8,7 @@
 import { join } from 'node:path';
 import { existsSync, readdirSync } from 'node:fs';
 import type { Blackboard } from '../blackboard.ts';
-import type { BlackboardWorkItem } from 'ivy-blackboard/src/types';
+import type { BlackboardWorkItem } from 'ivy-blackboard/src/kernel/types';
 import { getLauncher, logPathForSession } from './launcher.ts';
 import {
   type SpecFlowPhase,
@@ -52,6 +52,7 @@ async function defaultSpawner(
     cwd,
     stdout: 'pipe',
     stderr: 'pipe',
+    env: { ...process.env },
   });
 
   let killed = false;
@@ -61,8 +62,8 @@ async function defaultSpawner(
   }, timeoutMs);
 
   const [stdout, stderr] = await Promise.all([
-    new Response(proc.stdout).text(),
-    new Response(proc.stderr).text(),
+    proc.stdout ? new Response(proc.stdout as any).text() : Promise.resolve(""),
+    proc.stderr ? new Response(proc.stderr as any).text() : Promise.resolve(""),
   ]);
   const exitCode = await proc.exited;
   clearTimeout(timer);

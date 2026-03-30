@@ -4,12 +4,12 @@ import {
     registerProject,
     listProjects,
     getProjectStatus,
-} from '../../kernel/project';
+} from '../../kernel/project.ts';
 import {
     formatJson,
     formatTable,
     formatRelativeTime,
-} from '../../kernel/output';
+} from '../../kernel/output.ts';
 
 /**
  * Register project commands on the unified ivy CLI.

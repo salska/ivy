@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 import type { CliContext } from '../cli.ts';
-import { formatJson, formatTable } from '../../kernel/output';
+import { formatJson, formatTable } from '../../kernel/output.ts';
 
 export function registerCacheCommands(
   parent: Command,

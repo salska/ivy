@@ -58,6 +58,8 @@ function makeWorkItem(
     claimed_at: new Date().toISOString(),
     completed_at: null,
     blocked_by: null,
+    handover_context: null,
+    approval_request: null,
     ...overrides,
   };
 }

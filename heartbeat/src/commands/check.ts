@@ -1,7 +1,7 @@
 import { Command } from 'commander';
 import type { CliContext } from '../cli.ts';
 import { runChecks } from '../check/runner.ts';
-import { formatJson } from 'ivy-blackboard/src/output';
+import { formatJson } from 'ivy-blackboard/src/kernel/output';
 import type { CheckResult, CheckSummary, DueCheckResult } from '../check/types.ts';
 
 export function registerCheckCommand(

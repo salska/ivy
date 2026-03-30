@@ -13,12 +13,12 @@ import {
     deleteWorkItem,
     updateWorkItemMetadata,
     appendWorkItemEvent,
-} from '../../kernel/work';
+} from '../../kernel/work.ts';
 import {
     formatJson,
     formatTable,
     formatRelativeTime,
-} from '../../kernel/output';
+} from '../../kernel/output.ts';
 
 /**
  * Register work-item commands on the unified ivy CLI.

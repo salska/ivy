@@ -3,7 +3,7 @@ import {
   openDatabase,
   closeDatabase,
   resolveDbPath,
-} from '../kernel/db';
+} from '../kernel/db.ts';
 import {
   registerAgent,
   sendHeartbeat,
@@ -13,7 +13,7 @@ import {
   type HeartbeatOptions,
   type HeartbeatResult,
   type DeregisterAgentResult,
-} from '../kernel/agent';
+} from '../kernel/agent.ts';
 import {
   createWorkItem,
   listWorkItems,
@@ -45,20 +45,20 @@ import {
   type ApproveWorkItemResult,
   type RejectWorkItemResult,
   type HandoverWorkItemResult,
-} from '../kernel/work';
+} from '../kernel/work.ts';
 import {
   createSnapshot,
   listSnapshots,
   restoreSnapshot,
   type CreateSnapshotResult,
   type RestoreSnapshotResult,
-} from '../kernel/snapshot';
-import { listProjects, type ProjectWithCounts } from '../kernel/project';
-import type { BlackboardProject, BlackboardWorkItem } from '../kernel/types';
+} from '../kernel/snapshot.ts';
+import { listProjects, type ProjectWithCounts } from '../kernel/project.ts';
+import type { BlackboardProject, BlackboardWorkItem } from '../kernel/types.ts';
 import { HeartbeatQueryRepository } from './repositories/heartbeats.ts';
 import { EventQueryRepository } from './repositories/events.ts';
 import { setupFTS5 } from './fts.ts';
-import { SemanticCache } from '../kernel/cache';
+import { SemanticCache } from '../kernel/cache.ts';
 
 /**
  * Ivy Heartbeat's interface to the blackboard.
@@ -264,7 +264,7 @@ export type {
   HeartbeatOptions,
   HeartbeatResult,
   DeregisterAgentResult,
-} from '../kernel/agent';
+} from '../kernel/agent.ts';
 
 export type {
   BlackboardAgent,
@@ -272,7 +272,7 @@ export type {
   BlackboardHeartbeat,
   BlackboardProject,
   BlackboardWorkItem,
-} from '../kernel/types';
+} from '../kernel/types.ts';
 
 export type {
   CreateWorkItemOptions,
@@ -291,14 +291,14 @@ export type {
   ApproveWorkItemResult,
   RejectWorkItemResult,
   HandoverWorkItemResult,
-} from '../kernel/work';
+} from '../kernel/work.ts';
 
 export type {
   CreateSnapshotResult,
   RestoreSnapshotResult,
-} from '../kernel/snapshot';
+} from '../kernel/snapshot.ts';
 
-export type { ProjectWithCounts } from '../kernel/project';
+export type { ProjectWithCounts } from '../kernel/project.ts';
 
 export * from './parser/types.ts';
 export { HeartbeatQueryRepository } from './repositories/heartbeats.ts';

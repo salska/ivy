@@ -49,11 +49,11 @@ export function registerSpecFlowQueueCommand(
       // Validate specflow CLI is available
       try {
         const proc = Bun.spawn(['which', 'specflow'], {
-          stdout: 'pipe',
-          stderr: 'pipe',
+          stdout: 'ignore',
+          stderr: 'ignore',
+          env: { ...process.env },
         });
-        await proc.exited;
-        if (proc.exitCode !== 0) {
+        if (await proc.exited !== 0) {
           throw new Error('not found');
         }
       } catch {
@@ -68,11 +68,11 @@ export function registerSpecFlowQueueCommand(
             cwd: project.local_path,
             stdout: 'pipe',
             stderr: 'pipe',
+            env: { ...process.env },
           });
-          const output = await new Response(proc.stdout).text();
-          await proc.exited;
-
-          if (proc.exitCode === 0) {
+          const output = await (proc.stdout ? new Response(proc.stdout as any).text() : Promise.resolve(""));
+          const exitCode = await proc.exited;
+          if (exitCode === 0) {
             const status = JSON.parse(output);
             const features = status.features ?? status;
             const featureList = Array.isArray(features) ? features : [];

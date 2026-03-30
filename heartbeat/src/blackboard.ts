@@ -30,6 +30,7 @@ import {
   type ClaimWorkItemResult,
   type CompleteWorkItemResult,
   type ReleaseWorkItemResult,
+  type WorkItemReleaseResult,
   type BlockWorkItemResult,
   type UnblockWorkItemResult,
   type SetWaitingResult,
@@ -92,7 +93,7 @@ export class Blackboard {
     return completeWorkItem(this.db, itemId, sessionId);
   }
 
-  releaseWorkItem(itemId: string, sessionId: string): ReleaseWorkItemResult {
+  releaseWorkItem(itemId: string, sessionId: string): WorkItemReleaseResult {
     return releaseWorkItem(this.db, itemId, sessionId);
   }
 
@@ -197,6 +198,7 @@ export type {
   ClaimWorkItemResult,
   CompleteWorkItemResult,
   ReleaseWorkItemResult,
+  WorkItemReleaseResult,
   BlockWorkItemResult,
   UnblockWorkItemResult,
   SetWaitingResult,

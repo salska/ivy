@@ -91,7 +91,7 @@ describe('CLI: agent deregister', () => {
     ctx.bb.deregisterAgent(agent.session_id);
 
     const agents = listAgents(ctx.bb.db, { all: true });
-    const found = agents.find(a => a.session_id === agent.session_id);
+    const found = agents.find((a: any) => a.session_id === agent.session_id);
     expect(found).toBeDefined();
     expect(found!.status).toBe('completed');
   });
@@ -106,7 +106,7 @@ describe('CLI: agent list', () => {
     ctx.bb.registerAgent({ name: 'Active2' });
     const agents = listAgents(ctx.bb.db);
     expect(agents.length).toBe(2);
-    expect(agents.every(a => a.status === 'active')).toBe(true);
+    expect(agents.every((a: any) => a.status === 'active')).toBe(true);
   });
 
   test('list excludes completed agents by default', () => {

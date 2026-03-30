@@ -8,18 +8,18 @@ import { listSkills, buildSkillContext } from '../skills.ts';
 import { loadPersona } from '../scheduler/persona-loader.ts';
 
 // Kernel imports for blackboard API routes
-import { getOverallStatus } from '../../kernel/status';
-import { getHealthStatus } from '../../kernel/health';
-import { listAgents } from '../../kernel/agent';
+import { getOverallStatus } from '../../kernel/status.ts';
+import { getHealthStatus } from '../../kernel/health.ts';
+import { listAgents } from '../../kernel/agent.ts';
 import {
     listWorkItems, getWorkItemStatus, deleteWorkItem,
     updateWorkItemMetadata, appendWorkItemEvent, flushActiveWorkItems,
     flushAllDatabase, createWorkItem
-} from '../../kernel/work';
-import { listProjects, getProjectDetail, registerProject } from '../../kernel/project';
-import { observeEvents } from '../../kernel/events';
-import { queryLearnings, getSteeringRules } from '../../kernel/learnings';
-import type { BlackboardAgent } from '../../kernel/types';
+} from '../../kernel/work.ts';
+import { listProjects, getProjectDetail, registerProject } from '../../kernel/project.ts';
+import { observeEvents } from '../../kernel/events.ts';
+import { queryLearnings, getSteeringRules } from '../../kernel/learnings.ts';
+import type { BlackboardAgent } from '../../kernel/types.ts';
 import { existsSync, readFileSync, statSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { homedir } from 'node:os';
@@ -312,12 +312,12 @@ export function startUnifiedServer(
                 if (path === '/api/metrics/monitoring') {
                     // Aggregate stats from semantic_cache table
                     const cacheStats = db.query('SELECT SUM(hits) as total_hits, COUNT(*) as entry_count FROM semantic_cache').get() as { total_hits: number | null, entry_count: number };
-                    
+
                     // Mock additional monitoring data for visualization
                     // In a production system, these would come from Prometheus or an OTel aggregator
                     const hits = cacheStats.total_hits ?? 0;
                     const misses = Math.floor(hits * 0.15) + 5; // Simulating some misses
-                    
+
                     const similarityBuckets = [
                         Math.floor(Math.random() * 5),
                         Math.floor(Math.random() * 8),
@@ -336,7 +336,7 @@ export function startUnifiedServer(
                         similarityBuckets,
                         throughput: (hits + misses) / 60 // Simple avg
                     };
-                    
+
                     return jsonOk(data, 200, cors);
                 }
 

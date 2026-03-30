@@ -4,7 +4,7 @@ import {
   formatJson,
   formatTable,
   formatRelativeTime,
-} from '../../kernel/output';
+} from '../../kernel/output.ts';
 import { generateSummary, formatSummaryText } from '../observe/summary.ts';
 
 export function registerObserveCommand(
@@ -56,7 +56,7 @@ export function registerObserveCommand(
             const headers = ['TIME', 'OUTCOME', 'SKILL', 'CREDENTIAL', 'SUMMARY'];
             const rows = credEvents.map((e) => {
               let meta: Record<string, unknown> = {};
-              try { meta = JSON.parse(typeof e.metadata === 'string' ? e.metadata : '{}'); } catch {}
+              try { meta = JSON.parse(typeof e.metadata === 'string' ? e.metadata : '{}'); } catch { }
               return [
                 formatRelativeTime(e.timestamp),
                 String(meta.outcome ?? '-'),

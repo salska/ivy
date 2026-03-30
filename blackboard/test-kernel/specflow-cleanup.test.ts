@@ -1,6 +1,6 @@
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 import { createTestContext, cleanupTestContext, type TestContext } from './helpers.ts';
-import { registerProject } from '../src/kernel/project';
+import { registerProject } from '../src/kernel/project.ts';
 import {
   evaluateSpecFlowCleanup,
   setCleanupBlackboard,

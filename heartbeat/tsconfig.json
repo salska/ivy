@@ -1,17 +1,43 @@
 {
   "compilerOptions": {
     // Environment setup & latest features
-    "lib": ["ESNext"],
+    "lib": ["ESNext", "DOM"],
     "target": "ESNext",
-    "module": "Preserve",
     "moduleDetection": "force",
     "jsx": "react-jsx",
     "allowJs": true,
+    "baseUrl": ".",
+    "rootDirs": [".", "../blackboard"],
+    "types": ["bun-types", "bun", "node"],
 
-    // Bundler mode
+    // Types & Paths
+    "paths": {
+      "ivy-blackboard/src/agent/*": ["../blackboard/src/kernel/agent/*"],
+      "ivy-blackboard/src/db/*": ["../blackboard/src/kernel/db/*"],
+      "ivy-blackboard/src/events/*": ["../blackboard/src/kernel/events/*"],
+      "ivy-blackboard/src/heartbeat/*": ["../blackboard/src/kernel/heartbeat/*"],
+      "ivy-blackboard/src/output/*": ["../blackboard/src/kernel/output/*"],
+      "ivy-blackboard/src/project/*": ["../blackboard/src/kernel/project/*"],
+      "ivy-blackboard/src/status/*": ["../blackboard/src/kernel/status/*"],
+      "ivy-blackboard/src/sweep/*": ["../blackboard/src/kernel/sweep/*"],
+      "ivy-blackboard/src/work/*": ["../blackboard/src/kernel/work/*"],
+      "ivy-blackboard/src/agent": ["../blackboard/src/kernel/agent.ts"],
+      "ivy-blackboard/src/db": ["../blackboard/src/kernel/db.ts"],
+      "ivy-blackboard/src/events": ["../blackboard/src/kernel/events.ts"],
+      "ivy-blackboard/src/heartbeat": ["../blackboard/src/kernel/index.ts"],
+      "ivy-blackboard/src/output": ["../blackboard/src/kernel/output.ts"],
+      "ivy-blackboard/src/project": ["../blackboard/src/kernel/project.ts"],
+      "ivy-blackboard/src/status": ["../blackboard/src/kernel/status.ts"],
+      "ivy-blackboard/src/sweep": ["../blackboard/src/kernel/sweep.ts"],
+      "ivy-blackboard/src/work": ["../blackboard/src/kernel/work.ts"],
+      "ivy-blackboard/src/types": ["../blackboard/src/kernel/types.ts"]
+    },
+
+    // Resolution mode
+    "module": "ESNext",
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
-    "verbatimModuleSyntax": true,
+    "preserveSymlinks": true,
     "noEmit": true,
 
     // Best practices
@@ -25,5 +51,10 @@
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "noPropertyAccessFromIndexSignature": false
-  }
+  },
+  "include": [
+    "src/**/*.ts",
+    "test/**/*.ts",
+    "../blackboard/src/**/*.ts"
+  ]
 }

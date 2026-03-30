@@ -305,7 +305,8 @@ async function defaultLauncher(opts: LaunchOptions): Promise<LaunchResult> {
     // and kill the process immediately to avoid wasting ~5 minutes.
     let quotaDetected = false;
     const stderrPromise = (async () => {
-      const reader = (proc.stderr as ReadableStream<Uint8Array>).getReader();
+      const reader = (proc.stderr as ReadableStream<Uint8Array> | null)?.getReader();
+      if (!reader) return "";
       const decoder = new TextDecoder();
       const chunks: string[] = [];
 
@@ -370,8 +371,8 @@ async function defaultLauncher(opts: LaunchOptions): Promise<LaunchResult> {
 
     // Stream stdout (JSON) to log file in parallel
     const [stdout, stderr] = await Promise.all([
-      streamJsonToLog(proc.stdout as ReadableStream<Uint8Array>, logPath, abortController.signal),
-      stderrPromise,
+      proc.stdout ? streamJsonToLog(proc.stdout as any, logPath, abortController.signal) : Promise.resolve(""),
+      stderrPromise || Promise.resolve(""),
     ]);
 
     const exitCode = await proc.exited;
@@ -379,7 +380,7 @@ async function defaultLauncher(opts: LaunchOptions): Promise<LaunchResult> {
 
     // Write footer
     const durationSec = Math.round((Date.now() - startTime) / 1000);
-    appendFileSync(logPath, `\n=== Exit Code: ${exitCode === null ? 'KILLED' : exitCode} | Duration: ${durationSec}s ===\n`);
+    appendFileSync(logPath, `\n=== Exit Code: ${exitCode} | Duration: ${durationSec}s ===\n`);
 
     // If we hit a quota error OR a model not found error, try to fall back
     const isModelNotFound = exitCode !== 0 && stderr.includes('ModelNotFoundError');
