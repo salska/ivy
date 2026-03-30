@@ -7,9 +7,12 @@ import { CURRENT_SCHEMA_VERSION } from "../src/kernel/schema";
 import { resetConfigCache } from "../src/kernel/config";
 
 const TEST_DIR = join(tmpdir(), `blackboard-test-${Date.now()}`);
+let ORIGINAL_HOME: string | undefined;
 
 describe("resolveDbPath", () => {
   beforeEach(() => {
+    ORIGINAL_HOME = process.env.HOME;
+    process.env.HOME = TEST_DIR;
     mkdirSync(TEST_DIR, { recursive: true });
     // Clear env and config cache
     delete process.env.BLACKBOARD_DB;
@@ -17,6 +20,11 @@ describe("resolveDbPath", () => {
   });
 
   afterEach(() => {
+    if (ORIGINAL_HOME !== undefined) {
+      process.env.HOME = ORIGINAL_HOME;
+    } else {
+      delete process.env.HOME;
+    }
     rmSync(TEST_DIR, { recursive: true, force: true });
     resetConfigCache();
   });

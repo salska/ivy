@@ -41,7 +41,7 @@ function makeTanaNode(overrides: Partial<TanaNode> = {}): TanaNode {
   return {
     id: 'node-abc123',
     name: 'Fix the README typos',
-    tags: ['test-tag-id'],
+    tags: [{ id: 'test-tag-id', name: 'ivy-todo' }],
     workspaceId: 'ws-1',
     created: new Date().toISOString(),
     ...overrides,
@@ -60,8 +60,18 @@ function makeTanaNodeContent(overrides: Partial<TanaNodeContent> = {}): TanaNode
 
 function makeMockAccessor(overrides: Partial<TanaAccessor> = {}): TanaAccessor {
   return {
+    listWorkspaces: async () => [{ id: 'ws-1', name: 'My Workspace' }],
+    listTags: async () => [{ id: 'resolved-tag-id', name: 'ivy-todo' }],
+    resolveTagId: async (tagName) => {
+      const clean = tagName.startsWith('#') ? tagName.slice(1) : tagName;
+      if (clean === 'ivy-todo') return 'resolved-tag-id';
+      if (clean === 'test-tag-id' || tagName === 'test-tag-id') return 'test-tag-id';
+      return null;
+    },
+    searchNodes: async () => [],
     searchTodos: async () => [],
     readNode: async (nodeId) => makeTanaNodeContent({ id: nodeId }),
+    getChildren: async () => ({ children: [] }),
     addChildContent: async () => { },
     checkNode: async () => { },
     ...overrides,
@@ -102,9 +112,9 @@ describe('parseTanaTodosConfig', () => {
     expect(config.projectFieldId).toBe('field-123');
   });
 
-  test('returns empty tagId for missing tag_id', () => {
+  test('returns undefined tagId for missing tag_id', () => {
     const config = parseTanaTodosConfig(makeItem({ config: {} }));
-    expect(config.tagId).toBe('');
+    expect(config.tagId).toBeUndefined();
   });
 });
 
@@ -137,11 +147,33 @@ describe('evaluateTanaTodos', () => {
     expect(result.summary).toContain('blackboard not configured');
   });
 
-  test('returns error when tag_id is missing', async () => {
-    setTanaAccessor(makeMockAccessor());
+  test('returns error when tag resolution fails', async () => {
+    setTanaAccessor(makeMockAccessor({
+      resolveTagId: async () => null,
+    }));
     const result = await evaluateTanaTodos(makeItem({ config: {} }));
     expect(result.status).toBe('error');
-    expect(result.summary).toContain('missing tag_id');
+    expect(result.summary).toContain('could not resolve tag #ivy-todo');
+  });
+
+  test('resolves tag name to ID via tags list API', async () => {
+    let capturedTagId = '';
+    setTanaAccessor(makeMockAccessor({
+      resolveTagId: async (name) => {
+        const clean = name.startsWith('#') ? name.slice(1) : name;
+        return clean === 'my-tag' ? 'real-id-123' : null;
+      },
+      searchTodos: async (opts) => {
+        capturedTagId = opts.tagId;
+        if (opts.tagId === 'real-id-123') return [makeTanaNode({ id: 'n1' })];
+        return [];
+      }
+    }));
+
+    const result = await evaluateTanaTodos(makeItem({ config: { tag_id: '#my-tag' } }));
+    expect(result.status).toBe('alert');
+    expect(result.details?.newTodos).toBe(1);
+    expect(capturedTagId).toBe('real-id-123');
   });
 
   test('returns ok when no todos found', async () => {

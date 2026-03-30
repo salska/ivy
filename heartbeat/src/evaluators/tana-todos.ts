@@ -16,7 +16,7 @@ import { getTanaAccessor } from './tana-accessor.ts';
  * Parse tana_todos config from a checklist item's config fields.
  */
 export function parseTanaTodosConfig(item: ChecklistItem): TanaTodosConfig {
-  const tagId = typeof item.config.tag_id === 'string' ? item.config.tag_id : '';
+  const tagId = typeof item.config.tag_id === 'string' ? item.config.tag_id : undefined;
   return {
     tagId,
     workspaceId: typeof item.config.workspace_id === 'string' ? item.config.workspace_id : undefined,
@@ -97,14 +97,14 @@ export function resetTanaBlackboardAccessor(): void {
 // ─── Evaluator ────────────────────────────────────────────────────────────
 
 /**
- * Evaluate Tana todos: poll for #ivy-todo nodes and create blackboard work items.
+ * Evaluate Tana todos: poll for tagged nodes and create blackboard work items.
  *
- * For each unchecked #ivy-todo node in Tana:
- * - Checks dedup against existing work items (by source_ref = tana node ID)
- * - Reads child content for task instructions
- * - Runs content through the content filter
- * - Optionally associates with a blackboard project by name match
- * - Creates a work item with source='tana'
+ * Uses the Tana Search API to find unchecked todos:
+ * 1. Resolves tag name to ID via /workspaces/{id}/tags
+ * 2. Searches with hasType + not(done) via /nodes/search
+ * 3. Reads child content for task instructions
+ * 4. Runs content through the content filter
+ * 5. Creates work items with source='tana'
  */
 export async function evaluateTanaTodos(item: ChecklistItem): Promise<CheckResult> {
   if (!bbAccessor) {
@@ -117,21 +117,31 @@ export async function evaluateTanaTodos(item: ChecklistItem): Promise<CheckResul
   }
 
   const accessor = getTanaAccessor();
-
   const config = parseTanaTodosConfig(item);
-  if (!config.tagId) {
-    return {
-      item,
-      status: 'error',
-      summary: `Tana todos check: ${item.name} — missing tag_id in config`,
-      details: { error: 'tag_id is required in checklist config for tana_todos evaluator.' },
-    };
-  }
+
+  // Default to #ivy-todo if no tag specified
+  let tagIdToUse = config.tagId || '#ivy-todo';
 
   try {
-    // Fetch unchecked todos from Tana
+    // RESOLVE TAG: if it looks like a name (starts with # or isn't a raw ID),
+    // resolve it to an internal ID via the tags list API
+    if (tagIdToUse.startsWith('#') || !/^[A-Za-z0-9_-]{8,14}$/.test(tagIdToUse)) {
+      const resolved = await accessor.resolveTagId(tagIdToUse);
+      if (resolved) {
+        tagIdToUse = resolved;
+      } else {
+        return {
+          item,
+          status: 'error',
+          summary: `Tana todos check: ${item.name} — could not resolve tag ${tagIdToUse}`,
+          details: { error: `Tag resolution failed for ${tagIdToUse}. Ensure the tag exists in Tana and Tana Desktop is running.` },
+        };
+      }
+    }
+
+    // Search for unchecked todos using the Search API
     const todos = await accessor.searchTodos({
-      tagId: config.tagId,
+      tagId: tagIdToUse,
       workspaceId: config.workspaceId,
       limit: config.limit,
     });
@@ -147,25 +157,10 @@ export async function evaluateTanaTodos(item: ChecklistItem): Promise<CheckResul
 
     // Build set of already-tracked Tana node IDs
     const existingItems = bbAccessor.listWorkItems({ all: true });
-    const trackedNodeIds = new Set(
-      existingItems
-        .filter((w) => {
-          if (w.source_ref && w.metadata) {
-            try {
-              const m = JSON.parse(w.metadata);
-              return m.tana_node_id !== undefined;
-            } catch { /* ignore */ }
-          }
-          // Also check source_ref directly (tana node IDs stored there)
-          return false;
-        })
-        .map((w) => w.source_ref)
-        .filter((ref): ref is string => ref !== null)
-    );
+    const trackedNodeIds = new Set<string>();
 
-    // Also track by source_ref directly for items with source='tana'
     for (const w of existingItems) {
-      if (w.source_ref && w.metadata) {
+      if (w.metadata) {
         try {
           const m = JSON.parse(w.metadata);
           if (m.tana_node_id) {
@@ -174,8 +169,6 @@ export async function evaluateTanaTodos(item: ChecklistItem): Promise<CheckResul
         } catch { /* ignore */ }
       }
       if (w.source_ref) {
-        // Check if any existing work item has this as a tana source_ref
-        // Work items created by this evaluator use the node ID as source_ref
         trackedNodeIds.add(w.source_ref);
       }
     }
@@ -195,9 +188,7 @@ export async function evaluateTanaTodos(item: ChecklistItem): Promise<CheckResul
       let minimalContext = true;
       try {
         const nodeContent = await accessor.readNode(todo.id, 2);
-        // Extract text from markdown (children are the instructions)
         if (nodeContent.markdown && nodeContent.markdown.trim().length > 0) {
-          // Strip the first line (the node name itself) from the markdown
           const lines = nodeContent.markdown.split('\n');
           const childLines = lines.slice(1).join('\n').trim();
           if (childLines.length > 0) {
@@ -218,7 +209,6 @@ export async function evaluateTanaTodos(item: ChecklistItem): Promise<CheckResul
           `tana-${todo.id}`
         );
       } catch {
-        // Fail-open: if the content filter itself errors, allow the content
         filterResult = { decision: 'ALLOWED', matches: [] };
       }
 
@@ -230,7 +220,6 @@ export async function evaluateTanaTodos(item: ChecklistItem): Promise<CheckResul
       let projectId: string | null = null;
       let projectName: string | null = null;
       if (config.projectFieldId && todo.description) {
-        // Try to match project name from node description/fields
         const matchedProject = projects.find(
           (p) => p.display_name.toLowerCase() === todo.description!.toLowerCase()
         );
@@ -271,7 +260,7 @@ export async function evaluateTanaTodos(item: ChecklistItem): Promise<CheckResul
       const metadata: TanaWorkItemMetadata = {
         tana_node_id: todo.id,
         tana_workspace_id: todo.workspaceId,
-        tana_tag_id: config.tagId,
+        tana_tag_id: config.tagId || 'auto-resolved',
         content_filtered: true,
         content_blocked: contentBlocked,
         content_warning: contentWarning,

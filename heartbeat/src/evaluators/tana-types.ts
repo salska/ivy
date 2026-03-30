@@ -2,13 +2,30 @@ import type { ProjectWithCounts } from '../blackboard.ts';
 
 // ─── Tana local API response types ───────────────────────────────────────
 
+export interface TanaWorkspace {
+  id: string;
+  name?: string;
+  homeNodeId?: string;
+}
+
+export interface TanaTag {
+  id: string;
+  name: string;
+  color?: string;
+}
+
 export interface TanaNode {
   id: string;
   name: string;
-  tags?: string[];
+  markdown?: string;
+  tags?: Array<{ id: string; name: string }>;
+  tagIds?: string[];
   workspaceId?: string;
   description?: string;
   created?: string;
+  breadcrumb?: string[];
+  docType?: string;
+  inTrash?: boolean;
 }
 
 export interface TanaNodeContent {
@@ -18,40 +35,69 @@ export interface TanaNodeContent {
   children?: string[];
 }
 
+export interface TanaChildNode {
+  id: string;
+  name: string;
+  tags?: Array<{ id: string; name: string }>;
+}
+
+export interface TanaChildrenResult {
+  children: TanaChildNode[];
+  totalCount?: number;
+}
+
+// ─── Tana Search Query types ──────────────────────────────────────────────
+
+export interface TanaSearchFilter {
+  name?: string | { contains: string };
+  hasType?: string;
+  childOf?: { nodeIds: string[]; recursive?: boolean; includeReferences?: boolean };
+  ownedBy?: { nodeId: string; recursive?: boolean; includeSelf?: boolean };
+  linksTo?: string[];
+  is?: 'done' | 'todo' | 'template' | 'field' | 'published' | 'entity' | 'calendarNode' | 'onDayNode' | 'chat' | 'search' | 'command' | 'inLibrary';
+  has?: 'tag' | 'field' | 'media' | 'audio' | 'video' | 'image';
+  created?: { last: number };
+  edited?: { by?: string; last?: number; since?: number };
+  done?: { last: number };
+  onDate?: string | { date: string; fieldId?: string; overlaps?: boolean };
+  inWorkspace?: string;
+  overdue?: true;
+  inLibrary?: true;
+  not?: Partial<TanaSearchFilter>;
+}
+
+export interface TanaSearchQuery {
+  and?: TanaSearchFilter[];
+  or?: TanaSearchFilter[];
+}
+
 // ─── TanaAccessor interface (injectable for testing) ──────────────────────
 
-/**
- * Injectable Tana accessor — mirrors the BlackboardAccessor pattern.
- * Each method maps to a Tana local API endpoint (localhost:8262).
- */
 export interface TanaAccessor {
-  /** search_nodes with hasType filter for ivy-todo tag, unchecked only */
+  listWorkspaces(): Promise<TanaWorkspace[]>;
+  listTags(workspaceId: string): Promise<TanaTag[]>;
+  resolveTagId(tagName: string): Promise<string | null>;
+  searchNodes(query: TanaSearchQuery, opts?: {
+    workspaceIds?: string[];
+    limit?: number;
+  }): Promise<TanaNode[]>;
   searchTodos(opts: {
     tagId: string;
     workspaceId?: string;
     limit?: number;
   }): Promise<TanaNode[]>;
-
-  /** read_node with depth to get child content */
   readNode(nodeId: string, maxDepth?: number): Promise<TanaNodeContent>;
-
-  /** import_tana_paste to add result child under a node */
+  getChildren(nodeId: string, opts?: { limit?: number; offset?: number }): Promise<TanaChildrenResult>;
   addChildContent(parentNodeId: string, content: string): Promise<void>;
-
-  /** check_node to mark todo as done */
   checkNode(nodeId: string): Promise<void>;
 }
 
 // ─── Config types ─────────────────────────────────────────────────────────
 
 export interface TanaTodosConfig {
-  /** The Tana supertag ID for #ivy-todo (required) */
-  tagId: string;
-  /** Tana workspace ID (optional — defaults to first available) */
+  tagId?: string;
   workspaceId?: string;
-  /** Max todos to fetch per evaluation (default: 20) */
   limit: number;
-  /** Tana field ID for "Project" field on ivy-todo nodes (optional) */
   projectFieldId?: string;
 }
 
