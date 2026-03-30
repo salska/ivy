@@ -5,6 +5,7 @@
     "heartbeat"
   ],
   "scripts": {
-    "build": "cd heartbeat && bun run build && cd ../blackboard && bun run build"
+    "build": "cd heartbeat && bun run build && cd ../blackboard && bun run build",
+    "serve": "cd blackboard && bun run dev serve --dispatch"
   }
 }
