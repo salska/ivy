@@ -1,0 +1,3 @@
+[submodule "tools/specflow-bundle"]
+	path = tools/specflow-bundle
+	url = https://github.com/jcfischer/specflow-bundle.git
