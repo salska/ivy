@@ -3,5 +3,8 @@
   "workspaces": [
     "blackboard",
     "heartbeat"
-  ]
+  ],
+  "scripts": {
+    "build": "cd heartbeat && bun run build && cd ../blackboard && bun run build"
+  }
 }

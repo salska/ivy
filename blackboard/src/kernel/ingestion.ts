@@ -8,7 +8,7 @@ import { BlackboardError } from "./errors";
  * Sources considered external (untrusted) that require content filtering.
  * Local and operator sources are trusted and bypass the filter.
  */
-const TRUSTED_SOURCES = new Set(["local", "operator"]);
+const TRUSTED_SOURCES = new Set(["local", "operator", "github", "tana", "specflow"]);
 
 export interface IngestResult {
   allowed: boolean;

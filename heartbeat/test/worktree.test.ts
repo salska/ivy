@@ -14,6 +14,16 @@ import {
   getConflictedFiles,
 } from '../src/scheduler/worktree.ts';
 
+let worktreeBase: string;
+beforeEach(() => {
+  worktreeBase = mkdtempSync(join(tmpdir(), 'hb-worktree-base-'));
+  process.env.IVY_WORKTREE_DIR = worktreeBase;
+});
+
+afterEach(() => {
+  rmSync(worktreeBase, { recursive: true, force: true });
+});
+
 /**
  * Initialize a real git repo in a temp directory with an initial commit.
  */

@@ -14,6 +14,8 @@ import {
   getConflictedFiles,
 } from '../src/runtime/scheduler/worktree.ts';
 
+let originalWorktreeDir: string | undefined;
+
 /**
  * Initialize a real git repo in a temp directory with an initial commit.
  */
@@ -99,11 +101,18 @@ describe('getCurrentBranch', () => {
 describe('createWorktree', () => {
   let repoDir: string;
 
+  let worktreeDir: string;
+
   beforeEach(async () => {
     repoDir = await initTestRepo();
+    worktreeDir = mkdtempSync(join(tmpdir(), 'bb-worktrees-'));
+    originalWorktreeDir = process.env.IVY_WORKTREE_DIR;
+    process.env.IVY_WORKTREE_DIR = worktreeDir;
   });
 
   afterEach(async () => {
+    process.env.IVY_WORKTREE_DIR = originalWorktreeDir;
+    rmSync(worktreeDir, { recursive: true, force: true });
     // Clean up any worktrees first
     const proc = Bun.spawn(['git', 'worktree', 'list', '--porcelain'], {
       cwd: repoDir,

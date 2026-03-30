@@ -19,7 +19,11 @@
     "ivy-heartbeat": "src/cli.ts"
   },
   "scripts": {
-    "test": "bun test"
+    "dev": "bun run src/cli.ts",
+    "test": "bun test",
+    "typecheck": "bunx tsc --noEmit",
+    "ci": "bun test && bunx tsc --noEmit",
+    "build": "bun test && bunx tsc --noEmit"
   },
   "devDependencies": {
     "@types/bun": "latest",

@@ -32,7 +32,7 @@ describe('web dashboard server', () => {
     expect(res.status).toBe(200);
     expect(res.headers.get('content-type')).toContain('text/html');
     const html = await res.text();
-    expect(html).toContain('Ivy Heartbeat Dashboard');
+    expect(html).toContain('Ivy Health Dashboard');
   });
 
   test('GET /api/events returns JSON array', async () => {
@@ -112,7 +112,7 @@ describe('dashboard HTML', () => {
   test('generates valid HTML with required elements', () => {
     const html = generateDashboardHTML();
     expect(html).toContain('<!DOCTYPE html>');
-    expect(html).toContain('Ivy Heartbeat Dashboard');
+    expect(html).toContain('Ivy Health Dashboard');
     expect(html).toContain('/api/events');
     expect(html).toContain('/api/summary');
     expect(html).toContain('/api/search');
