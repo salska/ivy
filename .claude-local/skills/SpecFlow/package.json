@@ -1,0 +1,27 @@
+{
+  "name": "specflow",
+  "version": "0.1.0",
+  "description": "Multi-agent orchestration for spec-driven development",
+  "type": "module",
+  "main": "src/index.ts",
+  "bin": {
+    "specflow": "./src/index.ts"
+  },
+  "scripts": {
+    "start": "bun run src/index.ts",
+    "test": "bun test",
+    "embed-migrations": "bun run scripts/embed-migrations.ts",
+    "build": "bun run embed-migrations",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.71.2",
+    "commander": "^12.1.0",
+    "mysql2": "^3.20.0",
+    "yaml": "^2.8.2"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.7.2"
+  }
+}

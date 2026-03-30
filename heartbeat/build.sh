@@ -19,4 +19,4 @@ cp "${DIST_DIR}/${BINARY_NAME}" "${INSTALL_DIR}/${BINARY_NAME}"
 xattr -c "${INSTALL_DIR}/${BINARY_NAME}" 2>/dev/null || true
 codesign -f -s - "${INSTALL_DIR}/${BINARY_NAME}"
 
-echo "Done. $(${INSTALL_DIR}/${BINARY_NAME} --version)"
+echo "Done."
