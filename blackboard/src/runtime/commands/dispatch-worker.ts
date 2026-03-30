@@ -218,7 +218,8 @@ function buildPrompt(
   db: CliContext['bb']['db'],
   projectId?: string,
   metadata?: string | null,
-  handoverContext?: string | null
+  handoverContext?: string | null,
+  workDir?: string
 ): { prompt: string; personaName: string | null; missingSkills: string[] } {
   // Extract failed_by list to exclude stagnated personas from selection
   let excludePersonas: string[] = [];
@@ -253,6 +254,16 @@ function buildPrompt(
 
   if (description) {
     parts.push(`\nDescription: ${description}`);
+  }
+
+  if (workDir) {
+    parts.push(
+      `\n=== WORKSPACE DIRECTORY ===`,
+      `CRITICAL INSTRUCTION: You are operating in the strictly sandboxed workspace directory: ${workDir}`,
+      `All files you edit or access MUST be within this directory.`,
+      `Do NOT attempt to use absolute paths that reference files outside this directory, even if they appear in your task description or logs.`,
+      `Always prefer using relative paths (e.g., 'src/index.ts') for your tool calls to avoid boundary violations.`
+    );
   }
 
   parts.push(
@@ -516,7 +527,8 @@ export function registerDispatchWorkerCommand(
         bb.db,
         item.project_id ?? undefined,
         item.metadata,
-        item.handover_context
+        item.handover_context,
+        workDir
       );
 
       if (missingSkills.length > 0) {
