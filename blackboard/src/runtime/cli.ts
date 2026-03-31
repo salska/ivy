@@ -70,11 +70,18 @@ const program = new Command()
 
 let cached: CliContext | null = null;
 
+/**
+ * Standardized Context Factory:
+ * 1. Resolves DB path using the Level 1-4 chain (including upward walk).
+ * 2. Initializes the Blackboard kernel.
+ * 3. Mounts secondary brains if --attach is provided.
+ */
 function getContext(): CliContext {
   if (cached) return cached;
 
   const opts = program.opts();
-  const bb = new Blackboard(opts.db);
+  const dbPath = resolveDbPath({ dbPath: opts.db });
+  const bb = new Blackboard(dbPath);
 
   // ─── Attach secondary brains ───────────────────────────────────────
   let secondBrain: SecondBrainManager | undefined;
@@ -163,6 +170,11 @@ async function main() {
 }
 
 main().catch((err) => {
-  console.error(`[ivy] Fatal: ${err instanceof Error ? err.message : String(err)}`);
+  const opts = program.opts();
+  if (opts.json) {
+    console.log(JSON.stringify({ ok: false, error: err instanceof Error ? err.message : String(err) }));
+  } else {
+    console.error(`[ivy] Fatal: ${err instanceof Error ? err.message : String(err)}`);
+  }
   process.exit(1);
 });

@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { resolveDbPath, openDatabase, closeDatabase, getSchemaVersion } from "../src/kernel/db";
 import { CURRENT_SCHEMA_VERSION } from "../src/kernel/schema";
-import { resetConfigCache } from "../src/kernel/config";
+import { resetConfigCache, loadConfig } from "../src/kernel/config";
 
 const TEST_DIR = join(tmpdir(), `blackboard-test-${Date.now()}`);
 let ORIGINAL_HOME: string | undefined;
@@ -86,7 +86,6 @@ describe("resolveDbPath", () => {
     );
 
     // Load config from our custom path
-    const { loadConfig } = require("../src/kernel/config");
     loadConfig(configPath);
 
     const result = resolveDbPath({}, projectDir);

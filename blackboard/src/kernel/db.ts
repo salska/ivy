@@ -53,15 +53,15 @@ export function resolveDbPath(
   // Level 3: Recursive upward walk for .blackboard/local.db (per-project)
   let currentDir = workDir;
   while (currentDir !== dirname(currentDir)) {
-    const candidate = join(currentDir, config.database.projectDir, "local.db");
-    if (existsSync(candidate)) {
-      return candidate;
+    const projectDbDir = join(currentDir, config.database.projectDir);
+    if (existsSync(projectDbDir)) {
+      return join(projectDbDir, "local.db");
     }
     currentDir = dirname(currentDir);
   }
 
   // Level 4: operator-wide path from config (~ expanded to home)
-  const homeDir = home ?? homedir();
+  const homeDir = home ?? process.env.HOME ?? homedir();
   const operatorPath = config.database.operatorPath.replace(/^~/, homeDir);
   const operatorDir = dirname(operatorPath);
   mkdirSync(operatorDir, { recursive: true });

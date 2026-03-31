@@ -98,10 +98,12 @@ export function getSpecFlowPipelines(bb: Blackboard): PipelineFeature[] {
     });
 
     // Derive a feature name from the most descriptive title
-    const featureName = data.items[0]?.title
-      ?.replace(/^SpecFlow \w+: /, '')
-      ?.replace(featureId, '')
-      ?.trim() || featureId;
+    const rawTitle = data.items[0]?.title || '';
+    const featureName = rawTitle
+      .replace(/^SpecFlow \w+: /, '')
+      .replace(new RegExp(`\\b${featureId}\\b`, 'g'), '')
+      .replace(/[()]/g, '')
+      .trim() || featureId;
 
     pipelines.push({
       feature_id: featureId,

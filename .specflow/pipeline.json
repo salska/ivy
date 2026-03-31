@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "updated_at": "2026-03-31T01:52:01.479Z",
+  "project": "ivy-root",
+  "session_id": "6c333a9c-15e5-4aa2-86f0-1782ddf5e81d",
+  "features": [
+    {
+      "id": "F-1",
+      "name": "SQLite schema and database initialization",
+      "phase": "specify",
+      "status": "blocked",
+      "started_at": "2026-03-31T01:44:43.881Z",
+      "last_transition": "2026-03-31T01:52:01.479Z",
+      "session_id": "6c333a9c-15e5-4aa2-86f0-1782ddf5e81d",
+      "blocked_reason": "Claude exited with code 1",
+      "metrics": {}
+    }
+  ],
+  "failures": [
+    {
+      "feature_id": "F-1",
+      "phase": "specify",
+      "failure_type": "unknown",
+      "failure_route": "escalate",
+      "message": "Claude exited with code 1",
+      "occurred_at": "2026-03-31T01:47:47.768Z",
+      "recovered": false,
+      "retry_count": 0
+    },
+    {
+      "feature_id": "F-1",
+      "phase": "specify",
+      "failure_type": "unknown",
+      "failure_route": "escalate",
+      "message": "Claude exited with code 1",
+      "occurred_at": "2026-03-31T01:52:01.474Z",
+      "recovered": false,
+      "retry_count": 0
+    }
+  ]
+}

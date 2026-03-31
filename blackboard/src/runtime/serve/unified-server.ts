@@ -146,6 +146,16 @@ function switchTab(name) {
   document.getElementById('frame-' + name).classList.add('active');
 }
 
+// ─── Auto-Refresh Logic (Parent Shell) ─────────────────────────────
+// Reloads the visible iframe every 15 seconds to keep dashboard fresh.
+setInterval(() => {
+  const activeFrame = document.querySelector('.tab-content.active');
+  if (activeFrame) {
+    // Reload the frame contents by resetting its src
+    activeFrame.src = activeFrame.src;
+  }
+}, 15000);
+
 async function flushAllDatabase() {
   if (!confirm('☢️ NUCLEAR FLUSH ☢️\\n\\nAre you absolutely sure you want to completely flush the database?\\n\\nThis will permanently delete all running/completed agents, all active/historical work items, and all heartbeats and events.')) {
     return;
@@ -228,7 +238,7 @@ export function startUnifiedServer(
                     const pipelines = getSpecFlowPipelines(bb);
                     const html = renderSpecFlowPanel(pipelines);
                     return new Response(
-                        `<!DOCTYPE html><html><head><meta charset="utf-8"><meta http-equiv="refresh" content="15"><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:monospace;background:#0d1117;color:#c9d1d9;padding:20px;font-size:13px}</style></head><body>${html}</body></html>`,
+                        `<!DOCTYPE html><html><head><meta charset="utf-8"><meta http-equiv="refresh" content="5"><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:monospace;background:#0d1117;color:#c9d1d9;padding:20px;font-size:13px}</style></head><body>${html}</body></html>`,
                         { headers: { 'Content-Type': 'text/html', ...cors } },
                     );
                 }
