@@ -1,16 +1,16 @@
 {
   "version": 1,
-  "updated_at": "2026-03-31T01:52:01.479Z",
+  "updated_at": "2026-03-31T02:07:05.475Z",
   "project": "ivy-root",
   "session_id": "6c333a9c-15e5-4aa2-86f0-1782ddf5e81d",
   "features": [
     {
       "id": "F-1",
       "name": "SQLite schema and database initialization",
-      "phase": "specify",
-      "status": "blocked",
+      "phase": "plan",
+      "status": "in_progress",
       "started_at": "2026-03-31T01:44:43.881Z",
-      "last_transition": "2026-03-31T01:52:01.479Z",
+      "last_transition": "2026-03-31T02:07:05.475Z",
       "session_id": "6c333a9c-15e5-4aa2-86f0-1782ddf5e81d",
       "blocked_reason": "Claude exited with code 1",
       "metrics": {}
