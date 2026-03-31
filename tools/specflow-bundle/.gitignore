@@ -1,0 +1,34 @@
+# Dependencies
+node_modules/
+bun.lock
+
+# Build outputs
+dist/
+*.tsbuildinfo
+*.bun-build
+
+# Database files
+*.db
+*.db-shm
+*.db-wal
+
+# SpecFlow working files
+.specify/*
+!.specify/specs/
+spec-registry.json
+features.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+.specflow
