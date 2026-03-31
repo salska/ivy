@@ -24,11 +24,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/jcfischer/ivy-blackboard.git"
+    "url": "https://github.com/salska/ivy.git"
   },
-  "homepage": "https://github.com/jcfischer/ivy-blackboard",
+  "homepage": "https://github.com/salska/ivy",
   "bugs": {
-    "url": "https://github.com/jcfischer/ivy-blackboard/issues"
+    "url": "https://github.com/salska/ivy/issues"
   },
   "author": "Jens-Christian Fischer",
   "dependencies": {
