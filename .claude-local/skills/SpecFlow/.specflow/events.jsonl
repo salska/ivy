@@ -1,0 +1,7 @@
+{"type":"phase.started","timestamp":"2026-03-31T00:31:43.683Z","session_id":"6c386638-6114-470b-98b9-9169b68be11b","feature_id":"F-1","phase":"specify"}
+{"type":"phase.started","timestamp":"2026-03-31T00:40:34.468Z","session_id":"6c386638-6114-470b-98b9-9169b68be11b","feature_id":"F-1","phase":"specify"}
+{"type":"phase.failed","timestamp":"2026-03-31T00:43:40.056Z","session_id":"6c386638-6114-470b-98b9-9169b68be11b","feature_id":"F-1","phase":"specify","data":{"duration_ms":185587,"failure_type":"unknown","failure_route":"escalate","message":"Claude exited with code 1"}}
+{"type":"phase.started","timestamp":"2026-03-31T00:51:53.907Z","session_id":"6c386638-6114-470b-98b9-9169b68be11b","feature_id":"F-2","phase":"specify"}
+{"type":"phase.failed","timestamp":"2026-03-31T00:55:03.021Z","session_id":"6c386638-6114-470b-98b9-9169b68be11b","feature_id":"F-2","phase":"specify","data":{"duration_ms":189111,"failure_type":"unknown","failure_route":"escalate","message":"Claude exited with code 1"}}
+{"type":"phase.started","timestamp":"2026-03-31T01:02:02.749Z","session_id":"6c386638-6114-470b-98b9-9169b68be11b","feature_id":"F-2","phase":"specify"}
+{"type":"phase.failed","timestamp":"2026-03-31T01:04:55.280Z","session_id":"6c386638-6114-470b-98b9-9169b68be11b","feature_id":"F-2","phase":"specify","data":{"duration_ms":172528,"failure_type":"unknown","failure_route":"escalate","message":"Claude exited with code 1"}}

@@ -46,25 +46,17 @@ export function registerSpecFlowQueueCommand(
         process.exit(1);
       }
 
-      // Validate specflow CLI is available
-      try {
-        const proc = Bun.spawn(['which', 'specflow'], {
-          stdout: 'ignore',
-          stderr: 'ignore',
-          env: { ...process.env },
-        });
-        if (await proc.exited !== 0) {
-          throw new Error('not found');
-        }
-      } catch {
-        console.error('Error: specflow CLI not found. Ensure ~/bin/specflow exists and is in PATH.');
+      // Validate specflow bundle is available
+      const specflowPath = require('node:path').join(import.meta.dir, '../../../tools/specflow-bundle/packages/specflow/src/index.ts');
+      if (!require('node:fs').existsSync(specflowPath)) {
+        console.error(`Error: specflow CLI not found. Expected at ${specflowPath}`);
         process.exit(1);
       }
 
       // Check feature exists via specflow status
       if (project.local_path) {
         try {
-          const proc = Bun.spawn(['specflow', 'status', '--json'], {
+          const proc = Bun.spawn(['bun', 'run', specflowPath, 'status', '--json'], {
             cwd: project.local_path,
             stdout: 'pipe',
             stderr: 'pipe',

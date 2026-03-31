@@ -1,0 +1,62 @@
+{
+  "version": 1,
+  "updated_at": "2026-03-31T01:04:55.281Z",
+  "project": "specflow",
+  "session_id": "6c386638-6114-470b-98b9-9169b68be11b",
+  "features": [
+    {
+      "id": "F-1",
+      "name": "SQLite schema and database initialization",
+      "phase": "specify",
+      "status": "blocked",
+      "started_at": "2026-03-31T00:31:43.685Z",
+      "last_transition": "2026-03-31T00:43:40.058Z",
+      "session_id": "6c386638-6114-470b-98b9-9169b68be11b",
+      "blocked_reason": "Claude exited with code 1",
+      "metrics": {}
+    },
+    {
+      "id": "F-2",
+      "name": "CLI framework and command routing",
+      "phase": "specify",
+      "status": "blocked",
+      "started_at": "2026-03-31T00:51:53.908Z",
+      "last_transition": "2026-03-31T01:04:55.281Z",
+      "session_id": "6c386638-6114-470b-98b9-9169b68be11b",
+      "blocked_reason": "Claude exited with code 1",
+      "metrics": {}
+    }
+  ],
+  "failures": [
+    {
+      "feature_id": "F-1",
+      "phase": "specify",
+      "failure_type": "unknown",
+      "failure_route": "escalate",
+      "message": "Claude exited with code 1",
+      "occurred_at": "2026-03-31T00:43:40.055Z",
+      "recovered": false,
+      "retry_count": 0
+    },
+    {
+      "feature_id": "F-2",
+      "phase": "specify",
+      "failure_type": "unknown",
+      "failure_route": "escalate",
+      "message": "Claude exited with code 1",
+      "occurred_at": "2026-03-31T00:55:03.019Z",
+      "recovered": false,
+      "retry_count": 0
+    },
+    {
+      "feature_id": "F-2",
+      "phase": "specify",
+      "failure_type": "unknown",
+      "failure_route": "escalate",
+      "message": "Claude exited with code 1",
+      "occurred_at": "2026-03-31T01:04:55.278Z",
+      "recovered": false,
+      "retry_count": 0
+    }
+  ]
+}

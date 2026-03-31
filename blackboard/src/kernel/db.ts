@@ -50,10 +50,14 @@ export function resolveDbPath(
   const workDir = cwd ?? process.cwd();
   const config = loadConfig();
 
-  // Level 3: <projectDir>/local.db (per-project)
-  const projectDir = join(workDir, config.database.projectDir);
-  if (existsSync(projectDir)) {
-    return join(projectDir, "local.db");
+  // Level 3: Recursive upward walk for .blackboard/local.db (per-project)
+  let currentDir = workDir;
+  while (currentDir !== dirname(currentDir)) {
+    const candidate = join(currentDir, config.database.projectDir, "local.db");
+    if (existsSync(candidate)) {
+      return candidate;
+    }
+    currentDir = dirname(currentDir);
   }
 
   // Level 4: operator-wide path from config (~ expanded to home)

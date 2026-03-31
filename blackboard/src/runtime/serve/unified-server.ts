@@ -228,7 +228,7 @@ export function startUnifiedServer(
                     const pipelines = getSpecFlowPipelines(bb);
                     const html = renderSpecFlowPanel(pipelines);
                     return new Response(
-                        `<!DOCTYPE html><html><head><meta charset="utf-8"><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:monospace;background:#0d1117;color:#c9d1d9;padding:20px;font-size:13px}</style></head><body>${html}</body></html>`,
+                        `<!DOCTYPE html><html><head><meta charset="utf-8"><meta http-equiv="refresh" content="15"><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:monospace;background:#0d1117;color:#c9d1d9;padding:20px;font-size:13px}</style></head><body>${html}</body></html>`,
                         { headers: { 'Content-Type': 'text/html', ...cors } },
                     );
                 }

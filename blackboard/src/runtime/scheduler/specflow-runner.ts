@@ -48,8 +48,16 @@ async function defaultSpawner(
   cwd: string,
   timeoutMs: number
 ): Promise<{ exitCode: number; stdout: string; stderr: string }> {
-  const specflowBin = process.env.SPECFLOW_BIN ?? join(process.env.HOME ?? '', 'bin', 'specflow');
-  const proc = Bun.spawn([specflowBin, ...args], {
+  let cmd: string[];
+  if (process.env.SPECFLOW_BIN) {
+    cmd = [process.env.SPECFLOW_BIN, ...args];
+  } else {
+    // Resolve monorepo-local specflow tool
+    const specflowPath = join(import.meta.dir, '../../../../tools/specflow-bundle/packages/specflow/src/index.ts');
+    cmd = ['bun', 'run', specflowPath, ...args];
+  }
+
+  const proc = Bun.spawn(cmd, {
     cwd,
     stdout: 'pipe',
     stderr: 'pipe',
@@ -189,16 +197,28 @@ export async function runSpecFlowPhase(
     metadata: { worktreePath, phase },
   });
 
+  // Determine sub-path if project is in a monorepo
+  let projectRelPath = '';
+  try {
+    const proc = Bun.spawn(['git', 'rev-parse', '--show-toplevel'], { cwd: project.local_path });
+    const gitRoot = (await new Response(proc.stdout).text()).trim();
+    if (gitRoot && project.local_path.startsWith(gitRoot)) {
+      projectRelPath = project.local_path.substring(gitRoot.length + 1);
+    }
+  } catch {}
+
+  const worktreeProjectPath = projectRelPath ? join(worktreePath, projectRelPath) : worktreePath;
+
   // ─── Ensure specflow is initialized in the worktree ─────────────
-  const specflowDbPath = join(worktreePath, '.specflow', 'features.db');
-  const legacyDbPath = join(worktreePath, '.specify', 'specflow.db');
+  const specflowDbPath = join(worktreeProjectPath, '.specflow', 'features.db');
+  const legacyDbPath = join(worktreeProjectPath, '.specify', 'specflow.db');
   if (!existsSync(specflowDbPath) && !existsSync(legacyDbPath)) {
     // Try init strategies in order of preference:
     // 1. --from-features (imports existing feature definitions)
     // 2. --batch with --from-spec (non-interactive, uses app context)
     // 3. --batch with project ID as description (minimal fallback)
-    const featuresPath = join(worktreePath, 'features.json');
-    const appContextPath = join(worktreePath, '.specify', 'app-context.md');
+    const featuresPath = join(worktreeProjectPath, 'features.json');
+    const appContextPath = join(worktreeProjectPath, '.specify', 'app-context.md');
 
     let initArgs: string[];
     if (existsSync(featuresPath)) {
@@ -209,7 +229,7 @@ export async function runSpecFlowPhase(
       initArgs = ['init', '--batch', project.project_id];
     }
 
-    const initResult = await spawner(initArgs, worktreePath, 60_000);
+    const initResult = await spawner(initArgs, worktreeProjectPath, 60_000);
     if (initResult.exitCode !== 0) {
       bb.appendEvent({
         actorId: sessionId,
@@ -233,7 +253,7 @@ export async function runSpecFlowPhase(
   // worktree was recreated with a fresh specflow.db from features.json.
   if (phase === 'specify') {
     // Check if the feature exists via specflow status --json
-    const checkResult = await spawner(['status', '--json'], worktreePath, 10_000);
+    const checkResult = await spawner(['status', '--json'], worktreeProjectPath, 10_000);
     const featureMissing = checkResult.exitCode !== 0
       || !checkResult.stdout.includes(`"id":"${featureId}"`)
       && !checkResult.stdout.includes(`"id": "${featureId}"`);
@@ -244,7 +264,7 @@ export async function runSpecFlowPhase(
       const featureDesc = item.description ?? featureName;
       const addResult = await spawner(
         ['add', featureName, featureDesc, '--priority', '1'],
-        worktreePath,
+        worktreeProjectPath,
         30_000
       );
       if (addResult.exitCode === 0) {
@@ -260,15 +280,6 @@ export async function runSpecFlowPhase(
           summary: `Registered feature ${originalFeatureId} as ${featureId} in specflow`,
           metadata: { originalFeatureId, specflowFeatureId: featureId },
         });
-
-        // Enrich with defaults so batch specify can run
-        await spawner([
-          'enrich', featureId,
-          '--problem-type', 'manual_workaround',
-          '--urgency', 'user_demand',
-          '--primary-user', 'developers',
-          '--integration-scope', 'extends_existing',
-        ], worktreePath, 30_000);
       } else {
         bb.appendEvent({
           actorId: sessionId,
@@ -279,13 +290,22 @@ export async function runSpecFlowPhase(
         throw new SpecFlowError(`Failed to register feature ${featureId}: ${addResult.stderr.slice(0, 500)}`, true);
       }
     }
+
+    // Always enrich with defaults if needed so batch specify can run autonomously
+    await spawner([
+      'enrich', featureId,
+      '--problem-type', 'manual_workaround',
+      '--urgency', 'user_demand',
+      '--primary-user', 'developers',
+      '--integration-scope', 'extends_existing',
+    ], worktreeProjectPath, 30_000);
   }
 
   // ─── Build CLI arguments ─────────────────────────────────────────
   const cliArgs = buildCliArgs(phase, featureId, meta);
 
   // ─── Run specflow CLI ────────────────────────────────────────────
-  const result = await spawner(cliArgs, worktreePath, SPECFLOW_TIMEOUT_MS);
+  const result = await spawner(cliArgs, worktreeProjectPath, SPECFLOW_TIMEOUT_MS);
 
   if (result.exitCode === -1) {
     // Timeout
@@ -311,7 +331,7 @@ export async function runSpecFlowPhase(
         });
 
         const generated = await generateMissingArtifacts(
-          missingArtifacts, featureId, worktreePath, sessionId, bb, item.item_id
+          missingArtifacts, featureId, worktreeProjectPath, sessionId, bb, item.item_id
         );
 
         if (generated) {
@@ -323,7 +343,7 @@ export async function runSpecFlowPhase(
             metadata: { phase, featureId },
           });
 
-          const retryResult = await spawner(cliArgs, worktreePath, SPECFLOW_TIMEOUT_MS);
+          const retryResult = await spawner(cliArgs, worktreeProjectPath, SPECFLOW_TIMEOUT_MS);
           if (retryResult.exitCode === 0) {
             bb.appendEvent({
               actorId: sessionId,
@@ -391,7 +411,7 @@ export async function runSpecFlowPhase(
     const launchResult = await launcher({
       sessionId,
       prompt: result.stdout.trim(),
-      workDir: worktreePath,
+      workDir: worktreeProjectPath,
       timeoutMs: SPECFLOW_TIMEOUT_MS,
     });
 
@@ -417,7 +437,7 @@ export async function runSpecFlowPhase(
   const rubric = PHASE_RUBRICS[phase];
   if (rubric) {
     const gateResult = await checkQualityGate(
-      worktreePath, phase, featureId, bb, item, sessionId
+      worktreeProjectPath, phase, featureId, bb, item, sessionId
     );
 
     if (!gateResult.passed) {
@@ -459,7 +479,7 @@ export async function runSpecFlowPhase(
 
   // ─── Complete phase: cleanup ─────────────────────────────────────
   if (phase === 'complete') {
-    await spawner(['complete', featureId], worktreePath, 60_000);
+    await spawner(['complete', featureId], worktreeProjectPath, 60_000);
     try {
       await worktreeOps.removeWorktree(project.local_path, worktreePath);
       bb.appendEvent({
